@@ -1,14 +1,12 @@
 <template>
-  <div id="app">
-    <main class="app-main">
+<div id="app">
+  <main class="app-main">
       <router-view />
-    </main>
-    <ChatbotFloating />
-  </div>
+  </main>
+</div>  
 </template>
 
 <script setup>
-import ChatbotFloating from '@/components/chat/ChatbotFloating.vue'
 </script>
 
 <style>

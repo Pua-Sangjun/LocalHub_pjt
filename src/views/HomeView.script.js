@@ -1,6 +1,5 @@
-import { ref, onMounted, onUnmounted, defineComponent, computed } from 'vue'
+import { ref, onMounted, onUnmounted, defineComponent } from 'vue'
 import MapWithPins from '@/components/MapWithPins.vue'
-import { posts as boardPosts } from '@/stores/posts'
 import cityCarousel from '@/assets/images/city_carousel.jpg'
 import hanokCarousel from '@/assets/images/hanok_carousel.jpg'
 import hangangCarousel from '@/assets/images/hangang_carousel.jpg'
@@ -17,13 +16,11 @@ export default defineComponent({
     MapWithPins,
   },
   setup() {
-    const posts = computed(() =>
-      boardPosts.value.slice(0, 5).map((post) => ({
-        id: post.id,
-        title: post.title,
-        date: new Date(post.createdAt).toLocaleDateString('ko-KR', { month: 'short', day: 'numeric' }),
-      }))
-    )
+    const posts = ref([
+      { id: 3, title: '서울역 근처 뜨끈한 국밥집 리스트 공유 🍲', date: '오늘' },
+      { id: 2, title: '이번 주말 반포한강공원 야시장 가시는 분?', date: '어제' },
+      { id: 1, title: '남산타워 꿀주차 구역 조용히 풉니다.', date: '3일 전' },
+    ])
 
     const heroSlides = [
       {
@@ -136,6 +133,10 @@ export default defineComponent({
       alert(`${id}번 게시글 상세 보기`)
     }
 
+    const toggleChat = () => {
+      alert('Netlify Functions 연동 챗봇 창 열기')
+    }
+
     return {
       posts,
       heroSlides,
@@ -149,6 +150,7 @@ export default defineComponent({
       prevSlide,
       goToWrite,
       goToDetail,
+      toggleChat,
     }
   },
 })

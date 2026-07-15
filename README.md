@@ -21,7 +21,7 @@
 
 - **Frontend**: Vue.js 3 (Vite)
 - **State/Storage**: 브라우저 `localStorage` (별도 백엔드 서버 없음)
-- **Chatbot**: Netlify Functions + OpenAI API (서버 환경변수 `OPENAI_API_KEY`, 클라이언트 노출 방지)
+- **Chatbot**: OpenAI API 직접 호출 (`.env` / `VITE_` 접두사로 키 관리)
 - **배포**: Netlify
 - **개발 도구**: VSCode + GitHub Copilot, OpenAI API Key
   - ⚠️ 보안 정책상 Claude Code, Codex, Cursor, Antigravity 등 기타 AI 코딩 도구 사용 금지
@@ -89,8 +89,7 @@ localhub/
 npm install
 
 # 환경변수 설정 (.env 파일 생성)
-OPENAI_API_KEY=your_api_key_here
-VITE_KAKAO_JAVASCRIPT_KEY=your_kakao_key_here
+VITE_OPENAI_API_KEY=your_api_key_here
 
 # 개발 서버 실행
 npm run dev
@@ -99,7 +98,7 @@ npm run dev
 npm run build
 ```
 
-> ⚠️ `OPENAI_API_KEY`는 Netlify Functions 서버에서만 사용됩니다. `VITE_` 접두사 없이 설정하세요. Netlify 대시보드 → Site settings → Environment variables에도 동일 키를 등록해야 배포 환경에서 동작합니다.
+> ⚠️ Vite의 `.env`(`VITE_` 접두사) 값은 빌드 결과물에 포함되어 브라우저에서 노출될 수 있습니다. 반드시 사용량 제한·결제 한도가 설정된 키만 사용하세요.
 
 ---
 
