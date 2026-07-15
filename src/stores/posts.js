@@ -78,6 +78,22 @@ export function validatePostPassword(id, password) {
   return post && post.password === password
 }
 
+function editAccessKey(id) {
+  return `localhub-edit-${id}`
+}
+
+export function grantEditAccess(id) {
+  sessionStorage.setItem(editAccessKey(id), '1')
+}
+
+export function hasEditAccess(id) {
+  return sessionStorage.getItem(editAccessKey(id)) === '1'
+}
+
+export function revokeEditAccess(id) {
+  sessionStorage.removeItem(editAccessKey(id))
+}
+
 export function deletePost(id) {
   posts.value = posts.value.filter((item) => item.id !== id)
 }
