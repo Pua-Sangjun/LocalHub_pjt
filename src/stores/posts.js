@@ -21,7 +21,9 @@ function loadPosts() {
     if (!stored) return []
     const parsed = JSON.parse(stored)
     if (!Array.isArray(parsed)) return []
-    return parsed.map(normalizePost)
+    return parsed
+      .filter((post) => !String(post.id ?? '').startsWith('seed-'))
+      .map(normalizePost)
   } catch {
     return []
   }
