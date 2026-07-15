@@ -10,31 +10,22 @@ export default defineConfig({
     },
   },
   server: {
-    // Dev-time middleware to call KMA, parse the plaintext grid (149x253)
-    // and return a single temperature value for Seoul.
-    // Note: This runs only in Vite dev server. For production, replace with a proper backend.
     port: 5173,
   },
   plugins: [
-    // keep the Vue plugin
     vue(),
-    // custom plugin to handle /api/kma requests and return a single temperature
     {
       name: 'kma-dev-middleware',
       configureServer(server) {
         server.middlewares.use('/api/kma', async (req, res, next) => {
           try {
-            // Reconstruct target KMA URL by rewriting the path
-            const originalUrl = req.url || '' // path+query relative to the mounted /api/kma
-            // req.url when middleware is mounted at '/api/kma' is the remainder (e.g. '/?authKey=...')
-            // Ensure we don't introduce an extra trailing slash before the query string.
+            const originalUrl = req.url || ''
             let qs = originalUrl
-            if (originalUrl.startsWith('/?')) qs = originalUrl.slice(1) // turn '/?a=b' -> '?a=b'
+            if (originalUrl.startsWith('/?')) qs = originalUrl.slice(1)
             const rewritePath = '/api/typ01/cgi-bin/url/nph-dfs_shrt_grd' + qs
             const targetBase = 'https://apihub.kma.go.kr'
             const url = targetBase + rewritePath
 
-            // Forward the request to KMA
             console.log('[kma-dev-middleware] fetching', url, 'rewritePath=', rewritePath)
             let kmaResp
             try {
@@ -54,7 +45,6 @@ export default defineConfig({
               return
             }
 
-            // Parse numbers by whitespace
             const nums = text.trim().split(/\s+/)
 
             const COLS = 149
@@ -63,8 +53,8 @@ export default defineConfig({
             const NY = 127 // Seoul
 
             const idxA = (NY - 1) * COLS + (NX - 1)
-            const idxB = (ROWS - NY) * COLS + (NX - 1) // flipped vertically
-
+            const idxB = (ROWS - NY) * COLS + (NX - 1)
+             
             const parseVal = (i) => {
               if (i < 0 || i >= nums.length) return NaN
               const v = parseFloat(nums[i])
@@ -76,7 +66,6 @@ export default defineConfig({
 
             let chosen = valA
 
-            // Try to validate orientation by comparing with an external known Seoul temp (Open-Meteo)
             try {
               const om = await fetch('https://api.open-meteo.com/v1/forecast?latitude=37.5665&longitude=126.9780&current_weather=true')
               const omj = await om.json()
@@ -89,7 +78,6 @@ export default defineConfig({
                 chosen = valB
               }
             } catch (e) {
-              // If validation fails, fall back to a sensible value (prefer valA if valid)
               if (!Number.isFinite(chosen) && Number.isFinite(valB)) chosen = valB
             }
 
