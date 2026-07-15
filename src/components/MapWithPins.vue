@@ -14,7 +14,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, watch } from 'vue'
+import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { extractRegion } from '@/utils/attractions'
 
 const props = defineProps({
@@ -23,19 +23,36 @@ const props = defineProps({
   region: { type: String, default: '' },
   showRegionSelect: { type: Boolean, default: true },
   tall: { type: Boolean, default: false },
+  fitOnUpdate: { type: Boolean, default: false },
 })
 
 const emit = defineEmits(['select', 'marker-select', 'update:region'])
 
 const mapEl = ref(null)
 const map = ref(null)
-const markers = ref([])
+const markerEntries = ref([])
 const markerMap = ref({})
 const infoWindow = ref(null)
 const loadedPlaces = ref([])
 const regions = ref([])
 const selectedRegion = ref('')
 let pendingIdleHandler = null
+let resizeObserver = null
+let lastFittedKey = ''
+
+function getPlacesKey() {
+  return sourcePlaces.value
+    .map((item) => normalizePlace(item).id)
+    .filter(Boolean)
+    .join(',')
+}
+
+function ensureMapInteraction() {
+  if (!map.value) return
+  map.value.setDraggable(true)
+  map.value.setZoomable(true)
+  map.value.relayout()
+}
 
 const regionModel = computed({
   get: () => (props.showRegionSelect ? selectedRegion.value : props.region),
@@ -74,15 +91,63 @@ function normalizePlace(item) {
   }
 }
 
+function escapeHtml(value = '') {
+  return String(value)
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;')
+    .replaceAll("'", '&#39;')
+}
+
+function truncateLabel(title, maxLength = 9) {
+  const text = String(title || '').trim()
+  if (text.length <= maxLength) return text
+  return `${text.slice(0, maxLength)}…`
+}
+
 function clearMarkers() {
-  markers.value.forEach((marker) => marker.setMap(null))
-  markers.value = []
+  markerEntries.value.forEach((entry) => entry.overlay.setMap(null))
+  markerEntries.value = []
   markerMap.value = {}
 }
 
-function createMarker(place) {
+function bindBadgeEvents(element, placeId) {
+  const stopMapPropagation = (event) => {
+    event.stopPropagation()
+  }
+
+  element.addEventListener('mousedown', stopMapPropagation)
+  element.addEventListener('touchstart', stopMapPropagation, { passive: true })
+  element.addEventListener('click', (event) => {
+    event.stopPropagation()
+    emit('marker-select', placeId)
+  })
+}
+
+function createBadgeMarker(place, { isActive = false } = {}) {
   const position = new window.kakao.maps.LatLng(place.lat, place.lon)
-  return new window.kakao.maps.Marker({ position, title: place.title })
+  const element = document.createElement('button')
+
+  element.type = 'button'
+  element.className = `lh-map-badge${isActive ? ' is-active' : ''}`
+  element.title = place.title
+  element.innerHTML = `
+    <span class="lh-map-badge__label">${escapeHtml(truncateLabel(place.title))}</span>
+    <span class="lh-map-badge__point" aria-hidden="true"></span>
+  `
+
+  bindBadgeEvents(element, place.id)
+
+  const overlay = new window.kakao.maps.CustomOverlay({
+    position,
+    content: element,
+    xAnchor: 0.5,
+    yAnchor: 1,
+    zIndex: isActive ? 12 : 2,
+  })
+
+  return { overlay, element, placeId: place.id, position }
 }
 
 function getRegionBounds(region) {
@@ -220,7 +285,15 @@ async function loadPlaces() {
   }
 }
 
-function renderMarkers({ preserveView = false } = {}) {
+function updateMarkerHighlight(activeId = props.activeId) {
+  Object.entries(markerMap.value).forEach(([placeId, entry]) => {
+    const isActive = placeId === activeId
+    entry.element.classList.toggle('is-active', isActive)
+    entry.overlay.setZIndex(isActive ? 12 : 2)
+  })
+}
+
+function renderMarkers({ preserveView = false, fitBounds = !preserveView } = {}) {
   if (!map.value) return
 
   clearMarkers()
@@ -248,26 +321,28 @@ function renderMarkers({ preserveView = false } = {}) {
     if (!isExternallyFiltered && activeRegion && place.region !== activeRegion) return
     if (!isValidCoords(place.lat, place.lon, region)) return
 
-    const marker = createMarker(place)
-    marker.setMap(map.value)
-    window.kakao.maps.event.addListener(marker, 'click', () => {
-      emit('marker-select', place.id)
-    })
+    const entry = createBadgeMarker(place, { isActive: place.id === props.activeId })
+    entry.overlay.setMap(map.value)
 
-    markers.value.push(marker)
-    markerMap.value[place.id] = marker
-    bounds.extend(marker.getPosition())
+    markerEntries.value.push(entry)
+    markerMap.value[place.id] = entry
+    bounds.extend(entry.position)
     hasBounds = true
   })
 
-  if (!preserveView) {
+  if (fitBounds) {
     if (hasBounds) {
-      map.value.setBounds(bounds)
+      map.value.setBounds(bounds, 48, 48, 48, 48)
+      lastFittedKey = getPlacesKey()
     } else {
       map.value.setCenter(new window.kakao.maps.LatLng(37.5665, 126.978))
       map.value.setLevel(4)
+      lastFittedKey = ''
     }
   }
+
+  updateMarkerHighlight()
+  ensureMapInteraction()
 }
 
 function focusPlace(place, { showInfo = false } = {}) {
@@ -292,11 +367,18 @@ function onRegionChange(event) {
 }
 
 watch(
-  () => [sourcePlaces.value, regionModel.value],
+  () => [getPlacesKey(), regionModel.value],
   () => {
-    renderMarkers({ preserveView: Boolean(props.activeId) })
+    const shouldFit = props.fitOnUpdate && getPlacesKey() !== lastFittedKey
+    renderMarkers({ fitBounds: shouldFit || !lastFittedKey })
   },
-  { deep: true },
+)
+
+watch(
+  () => props.activeId,
+  (id) => {
+    updateMarkerHighlight(id)
+  },
 )
 
 onMounted(async () => {
@@ -305,17 +387,47 @@ onMounted(async () => {
     return
   }
 
-  map.value = new window.kakao.maps.Map(mapEl.value, {
-    center: new window.kakao.maps.LatLng(37.5665, 126.978),
-    level: 4,
+  const mapReady = new Promise((resolve) => {
+    const initMap = () => {
+      map.value = new window.kakao.maps.Map(mapEl.value, {
+        center: new window.kakao.maps.LatLng(37.5665, 126.978),
+        level: 4,
+        draggable: true,
+        scrollwheel: true,
+      })
+
+      window.kakao.maps.event.addListener(map.value, 'dragstart', ensureMapInteraction)
+      window.kakao.maps.event.addListener(map.value, 'zoom_changed', ensureMapInteraction)
+
+      if (mapEl.value && typeof ResizeObserver !== 'undefined') {
+        resizeObserver = new ResizeObserver(() => {
+          ensureMapInteraction()
+        })
+        resizeObserver.observe(mapEl.value)
+      }
+
+      resolve()
+    }
+
+    if (typeof window.kakao.maps.load === 'function') {
+      window.kakao.maps.load(initMap)
+    } else {
+      initMap()
+    }
   })
 
+  await mapReady
   await loadPlaces()
-  renderMarkers()
+  renderMarkers({ fitBounds: true })
 
   if (props.activeId) {
     focusById(props.activeId)
   }
+})
+
+onUnmounted(() => {
+  resizeObserver?.disconnect()
+  resizeObserver = null
 })
 
 defineExpose({ focusPlace, focusById })
@@ -325,6 +437,7 @@ defineExpose({ focusPlace, focusById })
 .map-wrap {
   position: relative;
   height: 460px;
+  touch-action: none;
 }
 
 .map-wrap.tall {
@@ -348,6 +461,7 @@ defineExpose({ focusPlace, focusById })
   width: 100%;
   height: 100%;
   border-radius: 12px;
+  touch-action: none;
 }
 
 @media (max-width: 900px) {
@@ -407,5 +521,63 @@ defineExpose({ focusPlace, focusById })
   object-fit: cover;
   border-radius: 8px;
   margin-bottom: 8px;
+}
+
+.lh-map-badge {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 5px;
+  margin: 0;
+  padding: 0;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Noto Sans KR', sans-serif;
+  transform: translateY(-2px);
+  transition: transform 0.15s ease;
+}
+
+.lh-map-badge__label {
+  display: block;
+  max-width: 124px;
+  padding: 6px 12px;
+  border-radius: 999px;
+  background: #fff;
+  border: 1.5px solid #8fd3ff;
+  color: #1a5fa0;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.25;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  box-shadow: 0 8px 18px rgba(15, 23, 42, 0.14);
+}
+
+.lh-map-badge__point {
+  display: block;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #3b82f6;
+  border: 2px solid #fff;
+  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.22);
+}
+
+.lh-map-badge.is-active {
+  transform: translateY(-4px) scale(1.04);
+}
+
+.lh-map-badge.is-active .lh-map-badge__label {
+  background: #0f172a;
+  border-color: #0f172a;
+  color: #fff;
+}
+
+.lh-map-badge.is-active .lh-map-badge__point {
+  width: 12px;
+  height: 12px;
+  background: #0f172a;
 }
 </style>

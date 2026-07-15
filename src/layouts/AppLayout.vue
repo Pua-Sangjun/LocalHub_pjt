@@ -33,7 +33,6 @@ const isSolidHeader = computed(() => route.meta.header !== 'hero')
 
 .layout-content {
   width: 100%;
-  overflow-x: hidden;
 }
 
 .layout-content.has-header-offset {

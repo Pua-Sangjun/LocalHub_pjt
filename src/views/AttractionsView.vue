@@ -12,7 +12,6 @@ import HomeAttractionsSection from '@/components/home/HomeAttractionsSection.vue
 .attractions-page {
   width: 100%;
   max-width: 100%;
-  overflow-x: hidden;
   min-height: calc(100vh - 80px);
   background: #eaedf2;
 }
