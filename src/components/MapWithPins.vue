@@ -39,6 +39,14 @@ const selectedRegion = ref('')
 let pendingIdleHandler = null
 let resizeObserver = null
 let lastFittedKey = ''
+let focusSequence = 0
+
+function clearPendingIdle() {
+  if (pendingIdleHandler && map.value) {
+    window.kakao.maps.event.removeListener(map.value, 'idle', pendingIdleHandler)
+    pendingIdleHandler = null
+  }
+}
 
 function getPlacesKey() {
   return sourcePlaces.value
@@ -51,6 +59,11 @@ function ensureMapInteraction() {
   if (!map.value) return
   map.value.setDraggable(true)
   map.value.setZoomable(true)
+}
+
+function relayoutMap() {
+  if (!map.value) return
+  ensureMapInteraction()
   map.value.relayout()
 }
 
@@ -113,12 +126,6 @@ function clearMarkers() {
 }
 
 function bindBadgeEvents(element, placeId) {
-  const stopMapPropagation = (event) => {
-    event.stopPropagation()
-  }
-
-  element.addEventListener('mousedown', stopMapPropagation)
-  element.addEventListener('touchstart', stopMapPropagation, { passive: true })
   element.addEventListener('click', (event) => {
     event.stopPropagation()
     emit('marker-select', placeId)
@@ -234,22 +241,24 @@ const FOCUS_DURATION = 800
 function moveMapToPlace(place, onComplete) {
   if (!map.value || !place?.lat || !place?.lon) return
 
+  const sequence = ++focusSequence
   const position = new window.kakao.maps.LatLng(place.lat, place.lon)
 
   if (infoWindow.value) {
     infoWindow.value.close()
   }
 
-  if (pendingIdleHandler) {
-    window.kakao.maps.event.removeListener(map.value, 'idle', pendingIdleHandler)
-    pendingIdleHandler = null
-  }
+  clearPendingIdle()
+
+  map.value.setCenter(map.value.getCenter())
 
   pendingIdleHandler = () => {
-    window.kakao.maps.event.removeListener(map.value, 'idle', pendingIdleHandler)
-    pendingIdleHandler = null
+    if (sequence !== focusSequence) return
+    clearPendingIdle()
     map.value.relayout()
-    onComplete?.()
+    if (sequence === focusSequence) {
+      onComplete?.()
+    }
   }
 
   window.kakao.maps.event.addListener(map.value, 'idle', pendingIdleHandler)
@@ -378,6 +387,9 @@ watch(
   () => props.activeId,
   (id) => {
     updateMarkerHighlight(id)
+    if (id) {
+      focusById(id)
+    }
   },
 )
 
@@ -396,12 +408,9 @@ onMounted(async () => {
         scrollwheel: true,
       })
 
-      window.kakao.maps.event.addListener(map.value, 'dragstart', ensureMapInteraction)
-      window.kakao.maps.event.addListener(map.value, 'zoom_changed', ensureMapInteraction)
-
       if (mapEl.value && typeof ResizeObserver !== 'undefined') {
         resizeObserver = new ResizeObserver(() => {
-          ensureMapInteraction()
+          relayoutMap()
         })
         resizeObserver.observe(mapEl.value)
       }
@@ -426,6 +435,7 @@ onMounted(async () => {
 })
 
 onUnmounted(() => {
+  clearPendingIdle()
   resizeObserver?.disconnect()
   resizeObserver = null
 })
@@ -437,7 +447,6 @@ defineExpose({ focusPlace, focusById })
 .map-wrap {
   position: relative;
   height: 460px;
-  touch-action: none;
 }
 
 .map-wrap.tall {
@@ -461,7 +470,6 @@ defineExpose({ focusPlace, focusById })
   width: 100%;
   height: 100%;
   border-radius: 12px;
-  touch-action: none;
 }
 
 @media (max-width: 900px) {
@@ -533,6 +541,7 @@ defineExpose({ focusPlace, focusById })
   border: none;
   background: transparent;
   cursor: pointer;
+  pointer-events: auto;
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Noto Sans KR', sans-serif;
   transform: translateY(-2px);
   transition: transform 0.15s ease;
