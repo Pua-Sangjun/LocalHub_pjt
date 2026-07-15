@@ -99,14 +99,8 @@ function parseKmaJsonResponse(json, nx = 60, ny = 127) {
 }
 
 export async function fetchKmaShortTermTemperature({ tmfc, tmef, nx = 60, ny = 127, vars = 'TMP' }) {
-  const authKey = import.meta.env.VITE_KMA_APIHUB_KEY
-  if (!authKey) {
-    throw new Error('KMA API key is missing. Please set VITE_KMA_APIHUB_KEY in .env.')
-  }
-
   const response = await axios.get('/api/kma', {
     params: {
-      authKey,
       tmfc,
       tmef,
       nx,
@@ -120,30 +114,12 @@ export async function fetchKmaShortTermTemperature({ tmfc, tmef, nx = 60, ny = 1
 
   if (typeof data === 'string') {
     const trimmed = data.trim()
-    // If the dev middleware returned a single numeric value (e.g. "26"), accept it.
-    if (/^-?\d+(?:\.\d+)?$/.test(trimmed)) {
-      return {
-        temperature: Number(trimmed),
-        raw: data,
-      }
+    if (!/^-?\d+(?:\.\d+)?$/.test(trimmed)) {
+      throw new Error(trimmed || '날씨 정보를 불러오지 못했습니다.')
     }
-    const parsedText = parseKmaTextResponse(data, nx, ny)
-    if (parsedText) {
-      return parsedText
-    }
-
-    try {
-      const json = JSON.parse(data)
-      const parsedJson = parseKmaJsonResponse(json, nx, ny)
-      return parsedJson || { raw: json }
-    } catch {
-      return { raw: data }
+    return {
+      temperature: Number(trimmed),
+      raw: data,
     }
   }
-
-  if (typeof data === 'object') {
-    return parseKmaJsonResponse(data, nx, ny) || { raw: data }
-  }
-
-  return { raw: data }
 }

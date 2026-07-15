@@ -1,8 +1,9 @@
-import { ref, computed, onMounted, onUnmounted, defineComponent } from 'vue'
+import { computed, defineComponent, onMounted, onUnmounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import MapWithPins from '@/components/MapWithPins.vue'
 import { loadAttractions } from '@/utils/attractions'
 import { posts } from '@/stores/posts'
+import { useChatbot } from '@/composables/useChatbot'
 import cityCarousel from '@/assets/images/city_carousel.jpg'
 import hanokCarousel from '@/assets/images/hanok_carousel.jpg'
 import hangangCarousel from '@/assets/images/hangang_carousel.jpg'
@@ -22,6 +23,7 @@ export default defineComponent({
   },
   setup() {
     const router = useRouter()
+    const { openChat } = useChatbot()
     const previewPlaces = ref([])
     const mapLoading = ref(true)
 
@@ -129,7 +131,7 @@ export default defineComponent({
     }
 
     const toggleChat = () => {
-      alert('Netlify Functions 연동 챗봇 창 열기')
+      openChat()
     }
 
     function formattedDate(value) {
