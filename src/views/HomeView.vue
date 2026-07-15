@@ -1,38 +1,122 @@
 <template>
-  <section class="page-section">
-    <div class="page-header">
-      <div>
-        <h1>LocalHub</h1>
-        <p>서울/경기 공공데이터 기반 여행 정보와 익명 커뮤니티를 한 곳에서 확인하세요.</p>
+  <div class="home-container">
+    <header class="gnb-seoul">
+      <div class="logo-area">
+        <h1 class="logo">LocalHub</h1>
+        <span class="region-badge-seoul">서울</span>
       </div>
-      <button class="button" @click="goBoard">게시판 바로가기</button>
-    </div>
+      <div class="header-right">
+        <div class="weather-badge">
+          <div class="weather-badge-main">
+            <span class="weather-icon">🌤️</span>
+            <strong class="weather-temp">
+              <template v-if="weatherLoading">--°C</template>
+              <template v-else-if="weatherError">--°C</template>
+              <template v-else-if="weather?.temperature !== undefined">{{ weather.temperature }}°C</template>
+              <template v-else>--°C</template>
+            </strong>
+          </div>
+        </div>
+      </div>
+    </header>
 
-    <div class="card-grid">
-      <article class="card">
-        <h3>지도 시각화</h3>
-        <p>관광지, 문화시설, 숙박, 축제, 쇼핑, 레포츠, 여행 코스를 지도에서 쉽게 찾아보세요.</p>
-        <router-link class="button button-secondary" to="/map">지도 보기</router-link>
-      </article>
+    <section class="hero-section">
+      <div class="hero-carousel full-width-carousel">
+        <div class="carousel-window">
+          <div
+            v-for="(slide, index) in heroSlides"
+            :key="slide.id"
+            class="hero-slide"
+            :class="{ active: activeSlide === index, fading: fadingSlide === index }"
+          >
+            <div class="slide-bg" :style="{ backgroundImage: `url(${slide.image})` }" />
+            <div class="slide-overlay">
+              <div class="hero-banner-copy">
+                <span class="eyebrow">{{ slide.label }}</span>
+                <h1 class="hero-title">{{ slide.title }}</h1>
+                <p class="hero-description">{{ slide.subtitle }}</p>
+                <div class="hero-actions">
+                  <button class="primary-btn" @click="goToWrite">여행지 둘러보기</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
 
-      <article class="card">
-        <h3>익명 게시판</h3>
-        <p>로그인 없이 글을 작성하고, 수정·삭제는 비밀번호로 간단히 제어합니다.</p>
-        <router-link class="button button-secondary" to="/board">게시판 보기</router-link>
-      </article>
+        <div class="carousel-controls">
+          <button type="button" @click="prevSlide" aria-label="Previous slide">‹</button>
+          <button type="button" @click="nextSlide" aria-label="Next slide">›</button>
+        </div>
+      </div>
+    </section>
 
-      <article class="card">
-        <h3>AI 챗봇</h3>
-        <p>오른쪽 하단 챗봇을 눌러 지역 추천, 명소 안내, 게시판 문의를 해결해보세요.</p>
-      </article>
-    </div>
-  </section>
+    <section class="quick-access-row">
+      <div
+        v-for="card in quickAccessCards"
+        :key="card.title"
+        :class="['info-card', { accent: card.accent }]"
+      >
+        <span class="card-title">{{ card.title }}</span>
+        <p>{{ card.description }}</p>
+      </div>
+    </section>
+
+    <main class="main-content">
+      <section class="card map-section">
+        <div class="card-header">
+          <div class="title-area">
+            <span class="emoji-icon">📍</span>
+            <h3>서울 관광 지도</h3>
+          </div>
+          <span class="info-text">공공데이터 플레이스</span>
+        </div>
+        <MapWithPins />
+      </section>
+
+      <section class="card board-section">
+        <div class="card-header">
+          <div class="title-area">
+            <span class="emoji-icon">💬</span>
+            <h3>서울 익명 피드</h3>
+          </div>
+          <button class="write-btn" @click="goToWrite">✏️ 글쓰기</button>
+        </div>
+
+        <div class="table-container">
+          <table class="board-table">
+            <thead>
+              <tr>
+                <th style="width: 15%; text-align: center;">번호</th>
+                <th style="width: 65%; text-align: left;">제목</th>
+                <th style="width: 20%; text-align: center;">작성일</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="post in posts" :key="post.id" @click="goToDetail(post.id)">
+                <td class="post-id">{{ post.id }}</td>
+                <td class="post-title">{{ post.title }}</td>
+                <td class="post-date">{{ post.date }}</td>
+              </tr>
+              <tr v-if="posts.length === 0">
+                <td colspan="3" class="empty-row">첫 피드를 남겨보세요!</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+    </main>
+
+    <footer class="footer">
+      <p>&copy; LocalHub. All rights reserved.</p>
+    </footer>
+
+    <button class="chat-fab" @click="toggleChat">
+      <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>
+      <span class="chat-tooltip">서울 챗봇 문의</span>
+    </button>
+  </div>
 </template>
 
-<script setup>
-import { useRouter } from 'vue-router'
-const router = useRouter()
-function goBoard() {
-  router.push({ name: 'board-list' })
-}
-</script>
+<script src="./HomeView.script.js"></script>
+
+<style scoped src="./HomeView.style.css"></style>
