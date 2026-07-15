@@ -304,6 +304,26 @@
   width: 5px;
 }
 
+.attraction-card-main {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  border: none;
+  background: transparent;
+  padding: 0;
+  text-align: left;
+  cursor: pointer;
+  font: inherit;
+  color: inherit;
+}
+
+.attraction-card .share-button-wrap.compact {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  z-index: 3;
+}
+
 .card-image-wrap {
   position: relative;
   flex-shrink: 0;
@@ -479,7 +499,22 @@
   flex-wrap: wrap;
   gap: 8px;
   justify-content: center;
+  align-items: center;
   margin-top: 4px;
+  width: 100%;
+}
+
+.pagination-meta {
+  min-width: 88px;
+  padding: 10px 14px;
+  border-radius: 999px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  color: #0f172a;
+  font-size: 0.88rem;
+  font-weight: 700;
+  text-align: center;
+  line-height: 1;
 }
 
 .pagination button:disabled {
@@ -596,19 +631,28 @@
   .explore-list {
     padding: 16px;
   }
-
-  .pagination {
-    gap: 6px;
-  }
-
-  .pagination button,
-  .page-number {
-    padding: 8px 10px;
-    font-size: 0.78rem;
-  }
 }
 
 @media (max-width: 640px) {
+  .pagination {
+    flex-wrap: nowrap;
+    gap: 10px;
+    padding-bottom: 4px;
+  }
+
+  .pagination-nav {
+    flex: 1;
+    max-width: 120px;
+    justify-content: center;
+  }
+
+  .pagination-meta {
+    flex-shrink: 0;
+    min-width: 96px;
+    padding: 10px 12px;
+    font-size: 0.84rem;
+  }
+
   .explore-map :deep(.map-wrap) {
     height: 300px;
     min-height: 300px;

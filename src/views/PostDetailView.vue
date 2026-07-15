@@ -36,6 +36,7 @@
 
         <div v-if="post" class="detail-actions">
           <button class="secondary-btn mobile-only" type="button" @click="goBack">목록으로</button>
+          <ShareButton mode="post" :post="post" />
           <button class="secondary-btn" type="button" @click="editPost">수정</button>
           <button class="primary-btn" type="button" @click="likePost">좋아요</button>
           <button class="danger-btn" type="button" @click="deletePost">삭제</button>
@@ -48,6 +49,7 @@
 <script setup>
 import { computed, onMounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
+import ShareButton from '@/components/ShareButton.vue'
 import {
   getPostById,
   incrementViews,
