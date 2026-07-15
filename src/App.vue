@@ -1,36 +1,20 @@
 <template>
-  <div id="app">
-    <HeaderLayout />
-
-    <main class="app-main">
+<div id="app">
+  <main class="app-main">
       <router-view />
-    </main>
-
-    <FooterLayout />
-    <ChatbotFloating />
-  </div>
+  </main>
+</div>  
 </template>
 
 <script setup>
-import HeaderLayout from './components/HeaderLayout.vue'
-import FooterLayout from './components/FooterLayout.vue'
-import ChatbotFloating from './components/chat/ChatbotFloating.vue'
 </script>
 
 <style>
-#app {
-  min-height: 100vh;
-  display: flex;
-  flex-direction: column;
-  background: #f5f7fb;
-  color: #111;
-}
-
-.app-main {
-  flex: 1;
-  width: 100%;
-  max-width: 1200px;
-  margin: 0 auto;
-  padding: 1.5rem 1rem;
+/* 앱 전체 공통 레이아웃은 필요한 경우 여기에서 정의합니다 */
+html, body, #app {
+  margin: 0;
+  min-height: 100%;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans KR", sans-serif;
+  background-color: #f8fafc;
 }
 </style>
