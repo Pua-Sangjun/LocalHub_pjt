@@ -1,0 +1,30 @@
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+img,
+video,
+svg {
+  max-width: 100%;
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+}
+
+@media (max-width: 640px) {
+  :root {
+    --page-inline-padding: 16px;
+  }
+}
+
+@media (min-width: 641px) {
+  :root {
+    --page-inline-padding: 24px;
+  }
+}

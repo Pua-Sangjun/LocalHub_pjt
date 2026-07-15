@@ -1,39 +1,87 @@
 <template>
-  <div class="map-wrap">
-    <select class="map-controls" v-model="selectedRegion">
-        <option value="">전체</option>
-        <option v-for="r in regions" :key="r" :value="r">{{ r }}</option>
+  <div class="map-wrap" :class="{ tall }">
+    <select
+      v-if="showRegionSelect"
+      class="map-controls"
+      :value="regionModel"
+      @change="onRegionChange"
+    >
+      <option value="">전체</option>
+      <option v-for="r in regionList" :key="r" :value="r">{{ r }}</option>
     </select>
     <div ref="mapEl" class="kakao-map-inner"></div>
   </div>
 </template>
 
 <script setup>
-import { ref, onMounted, watch } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
+import { extractRegion } from '@/utils/attractions'
+
+const props = defineProps({
+  places: { type: Array, default: null },
+  activeId: { type: String, default: '' },
+  region: { type: String, default: '' },
+  showRegionSelect: { type: Boolean, default: true },
+  tall: { type: Boolean, default: false },
+})
+
+const emit = defineEmits(['select', 'marker-select', 'update:region'])
 
 const mapEl = ref(null)
 const map = ref(null)
 const markers = ref([])
-const places = ref([])
+const markerMap = ref({})
+const infoWindow = ref(null)
+const loadedPlaces = ref([])
 const regions = ref([])
 const selectedRegion = ref('')
+let pendingIdleHandler = null
 
-function extractRegion(addr) {
-  if (!addr) return '기타'
-  const normalized = addr.replace(/\s+/g, ' ').trim()
-  const m = normalized.match(/서울(?:특별시)?\s*([가-힣]{2,}구)/)
-  return m ? m[1].replace(/\s+/g, '').trim() : '기타'
+const regionModel = computed({
+  get: () => (props.showRegionSelect ? selectedRegion.value : props.region),
+  set: (value) => {
+    if (props.showRegionSelect) {
+      selectedRegion.value = value
+    }
+    emit('update:region', value)
+  },
+})
+
+const sourcePlaces = computed(() => props.places ?? loadedPlaces.value)
+
+const regionList = computed(() => {
+  if (props.places) {
+    return getRegionOptions(props.places)
+  }
+  return regions.value
+})
+
+function getRegionOptions(items) {
+  const set = new Set(items.map((item) => item.region || extractRegion(item.addr1)))
+  return Array.from(set).sort((a, b) => a.localeCompare(b, 'ko'))
+}
+
+function normalizePlace(item) {
+  const lat = Number(item.lat ?? item.mapy)
+  const lon = Number(item.lon ?? item.mapx)
+
+  return {
+    ...item,
+    id: String(item.id ?? item.contentid),
+    region: item.region || extractRegion(item.addr1),
+    lat: Number.isFinite(lat) ? lat : null,
+    lon: Number.isFinite(lon) ? lon : null,
+  }
 }
 
 function clearMarkers() {
-  markers.value.forEach((mk) => {
-    mk.setMap(null)
-  })
+  markers.value.forEach((marker) => marker.setMap(null))
   markers.value = []
+  markerMap.value = {}
 }
 
 function createMarker(place) {
-  const position = new window.kakao.maps.LatLng(Number(place.mapy), Number(place.mapx))
+  const position = new window.kakao.maps.LatLng(place.lat, place.lon)
   return new window.kakao.maps.Marker({ position, title: place.title })
 }
 
@@ -87,129 +135,277 @@ function isValidCoords(lat, lon, region) {
   )
 }
 
+function buildInfoContent(place) {
+  const image = place.firstimage
+    ? `<img src="${place.firstimage}" alt="" class="map-info-image" />`
+    : ''
+
+  return `
+    <div class="map-info-window">
+      ${image}
+      <strong>${place.title}</strong>
+      <p>${place.addr1 || ''}</p>
+    </div>
+  `
+}
+
+function openInfoWindow(place) {
+  if (!map.value || !place?.lat || !place?.lon) return
+
+  const position = new window.kakao.maps.LatLng(place.lat, place.lon)
+
+  if (!infoWindow.value) {
+    infoWindow.value = new window.kakao.maps.InfoWindow({ removable: true })
+  }
+
+  infoWindow.value.setContent(buildInfoContent(place))
+  infoWindow.value.setPosition(position)
+  infoWindow.value.open(map.value)
+}
+
+const FOCUS_LEVEL = 3
+const FOCUS_DURATION = 800
+
+function moveMapToPlace(place, onComplete) {
+  if (!map.value || !place?.lat || !place?.lon) return
+
+  const position = new window.kakao.maps.LatLng(place.lat, place.lon)
+
+  if (infoWindow.value) {
+    infoWindow.value.close()
+  }
+
+  if (pendingIdleHandler) {
+    window.kakao.maps.event.removeListener(map.value, 'idle', pendingIdleHandler)
+    pendingIdleHandler = null
+  }
+
+  pendingIdleHandler = () => {
+    window.kakao.maps.event.removeListener(map.value, 'idle', pendingIdleHandler)
+    pendingIdleHandler = null
+    map.value.relayout()
+    onComplete?.()
+  }
+
+  window.kakao.maps.event.addListener(map.value, 'idle', pendingIdleHandler)
+
+  if (typeof map.value.jump === 'function') {
+    map.value.jump(position, FOCUS_LEVEL, {
+      animate: { duration: FOCUS_DURATION },
+    })
+    return
+  }
+
+  map.value.panTo(position, {
+    animate: { duration: FOCUS_DURATION },
+  })
+  map.value.setLevel(FOCUS_LEVEL, { animate: true })
+}
+
 async function loadPlaces() {
+  if (props.places) return
+
   try {
     const res = await fetch('/data/서울_관광지.json')
     const json = await res.json()
-    places.value = (json.items || [])
-      .map((it) => {
-        const region = extractRegion(it.addr1)
-        const lat = Number(it.mapy)
-        const lon = Number(it.mapx)
-        return {
-          ...it,
-          region,
-          lat,
-          lon,
-        }
-      })
-      .filter((p) => p.contentid)
+    loadedPlaces.value = (json.items || [])
+      .map(normalizePlace)
+      .filter((place) => place.id)
 
     const set = new Set()
-    places.value.forEach((p) => set.add(p.region))
-    regions.value = Array.from(set).sort()
-
-    console.log('[MapWithPins] loaded places', places.value.length, 'regions', regions.value.length)
-  } catch (e) {
-    console.error('failed to load places', e)
+    loadedPlaces.value.forEach((place) => set.add(place.region))
+    regions.value = Array.from(set).sort((a, b) => a.localeCompare(b, 'ko'))
+  } catch (error) {
+    console.error('failed to load places', error)
   }
 }
 
-function renderMarkers() {
+function renderMarkers({ preserveView = false } = {}) {
+  if (!map.value) return
+
   clearMarkers()
+  if (infoWindow.value) infoWindow.value.close()
 
-  const filtered = selectedRegion.value
-    ? places.value.filter((p) => p.region === selectedRegion.value)
-    : places.value
-
-  const uniqueFilter = []
+  const activeRegion = regionModel.value
+  const isExternallyFiltered = props.places != null
+  const uniquePlaces = []
   const seenIds = new Set()
-  filtered.forEach((p) => {
-    if (!p.contentid) return
-    if (seenIds.has(p.contentid)) return
-    seenIds.add(p.contentid)
-    uniqueFilter.push(p)
-  })
 
-  console.log(
-    '[MapWithPins] renderMarkers selectedRegion=',
-    selectedRegion.value,
-    'filteredCount=',
-    filtered.length,
-    'uniqueCount=',
-    uniqueFilter.length,
-  )
+  sourcePlaces.value.forEach((item) => {
+    const place = normalizePlace(item)
+    if (!place.id || seenIds.has(place.id)) return
+    seenIds.add(place.id)
+    uniquePlaces.push(place)
+  })
 
   const bounds = new window.kakao.maps.LatLngBounds()
-  const validPlaces = uniqueFilter.filter((p) => {
-    if (!Number.isFinite(p.lat) || !Number.isFinite(p.lon)) {
-      console.warn('[MapWithPins] skipped invalid coord', {
-        title: p.title,
-        addr1: p.addr1,
-        region: p.region,
-        lat: p.lat,
-        lon: p.lon,
-      })
-      return false
-    }
-    const region = selectedRegion.value || p.region
-    if (!isValidCoords(p.lat, p.lon, region)) {
-      console.warn('[MapWithPins] skipped out-of-region coord', {
-        title: p.title,
-        addr1: p.addr1,
-        region,
-        lat: p.lat,
-        lon: p.lon,
-      })
-      return false
-    }
-    return true
-  })
+  let hasBounds = false
 
-  validPlaces.forEach((p) => {
-    const mk = createMarker(p)
-    mk.setMap(map.value)
-    markers.value.push(mk)
-    bounds.extend(mk.getPosition())
-  })
+  uniquePlaces.forEach((place) => {
+    if (!Number.isFinite(place.lat) || !Number.isFinite(place.lon)) return
 
-  if (markers.value.length) {
-    map.value.setBounds(bounds)
-  } else {
-    map.value.setCenter(new window.kakao.maps.LatLng(37.5665, 126.9780))
-    map.value.setLevel(4)
-  }
+    const region = activeRegion || place.region
+    if (!isExternallyFiltered && activeRegion && place.region !== activeRegion) return
+    if (!isValidCoords(place.lat, place.lon, region)) return
 
-  const visibleTitles = markers.value.map((m) => m.getTitle())
-  if (visibleTitles.includes('백범광장(백범 김구선생 동상)') || visibleTitles.includes('신사공원')) {
-    console.warn('[MapWithPins] currently visible markers include special items', {
-      selectedRegion: selectedRegion.value,
-      visibleTitles,
+    const marker = createMarker(place)
+    marker.setMap(map.value)
+    window.kakao.maps.event.addListener(marker, 'click', () => {
+      emit('marker-select', place.id)
     })
+
+    markers.value.push(marker)
+    markerMap.value[place.id] = marker
+    bounds.extend(marker.getPosition())
+    hasBounds = true
+  })
+
+  if (!preserveView) {
+    if (hasBounds) {
+      map.value.setBounds(bounds)
+    } else {
+      map.value.setCenter(new window.kakao.maps.LatLng(37.5665, 126.978))
+      map.value.setLevel(4)
+    }
   }
 }
 
+function focusPlace(place, { showInfo = false } = {}) {
+  const normalized = normalizePlace(place)
+  if (!normalized.lat || !normalized.lon) return
+
+  moveMapToPlace(normalized, () => {
+    if (showInfo) openInfoWindow(normalized)
+  })
+}
+
+function focusById(id, options = {}) {
+  const place = sourcePlaces.value
+    .map(normalizePlace)
+    .find((item) => item.id === id)
+
+  if (place) focusPlace(place, options)
+}
+
+function onRegionChange(event) {
+  regionModel.value = event.target.value
+}
+
+watch(
+  () => [sourcePlaces.value, regionModel.value],
+  () => {
+    renderMarkers({ preserveView: Boolean(props.activeId) })
+  },
+  { deep: true },
+)
+
 onMounted(async () => {
-  if (!window.kakao || !window.kakao.maps) {
+  if (!window.kakao?.maps) {
     console.error('Kakao Maps SDK not available')
     return
   }
+
   map.value = new window.kakao.maps.Map(mapEl.value, {
-    center: new window.kakao.maps.LatLng(37.5665, 126.9780),
+    center: new window.kakao.maps.LatLng(37.5665, 126.978),
     level: 4,
   })
 
   await loadPlaces()
   renderMarkers()
+
+  if (props.activeId) {
+    focusById(props.activeId)
+  }
 })
 
-watch(selectedRegion, () => {
-  renderMarkers()
-})
+defineExpose({ focusPlace, focusById })
 </script>
 
 <style scoped>
-.map-wrap { position: relative; height: 460px; }
-.map-controls { position: absolute; top: 12px; left: 12px; z-index: 50; background: rgba(255,255,255,0.9); padding:6px 8px; border-radius:6px; box-shadow:0 2px 8px rgba(0,0,0,0.08); font-size:14px }
-.kakao-map-inner { width: 100%; height: 100%; border-radius:12px; }
+.map-wrap {
+  position: relative;
+  height: 460px;
+}
+
+.map-wrap.tall {
+  height: 640px;
+  min-height: 640px;
+}
+
+.map-controls {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  z-index: 50;
+  background: rgba(255, 255, 255, 0.9);
+  padding: 6px 8px;
+  border-radius: 6px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  font-size: 14px;
+}
+
+.kakao-map-inner {
+  width: 100%;
+  height: 100%;
+  border-radius: 12px;
+}
+
+@media (max-width: 900px) {
+  .map-wrap {
+    height: 380px;
+  }
+
+  .map-wrap.tall {
+    height: 420px;
+    min-height: 420px;
+  }
+}
+
+@media (max-width: 640px) {
+  .map-wrap {
+    height: 300px;
+  }
+
+  .map-wrap.tall {
+    height: 320px;
+    min-height: 320px;
+  }
+
+  .map-controls {
+    top: 8px;
+    left: 8px;
+    max-width: calc(100% - 16px);
+    font-size: 12px;
+  }
+}
+</style>
+
+<style>
+.map-info-window {
+  width: 220px;
+  padding: 4px 2px 2px;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Noto Sans KR', sans-serif;
+}
+
+.map-info-window strong {
+  display: block;
+  margin-bottom: 6px;
+  color: #0f172a;
+  font-size: 0.95rem;
+}
+
+.map-info-window p {
+  margin: 0;
+  color: #64748b;
+  font-size: 0.78rem;
+  line-height: 1.5;
+}
+
+.map-info-image {
+  width: 100%;
+  height: 110px;
+  object-fit: cover;
+  border-radius: 8px;
+  margin-bottom: 8px;
+}
 </style>
