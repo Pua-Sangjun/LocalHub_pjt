@@ -8,14 +8,14 @@
       </p>
       <div class="board-hero-row">
         <div>
-          <h1>익명 로컬 피드</h1>
+          <h1>지역 게시판</h1>
           <p class="board-description">
-            회원가입 없이 서울 로컬 팁을 남기고, 비밀번호로 수정·삭제할 수 있습니다.
+            본인만의 서울 정보를 마음껏 올려주세요!
           </p>
           <div class="feature-badges">
-            <span class="feature-badge">익명 작성</span>
-            <span class="feature-badge">비밀번호 보호</span>
-            <span class="feature-badge">로컬 저장</span>
+            <span class="feature-badge">맛집 투어</span>
+            <span class="feature-badge">숨겨진 관광 스팟</span>
+            <span class="feature-badge">축제 홍보</span>
           </div>
         </div>
         <button class="primary-btn" type="button" @click="goWrite">✏️ 글쓰기</button>
@@ -64,7 +64,7 @@
         <span class="empty-icon" aria-hidden="true">💬</span>
         <p v-if="query">검색 결과가 없습니다.</p>
         <p v-else>아직 글이 없습니다. 첫 로컬 팁을 남겨보세요!</p>
-        <button class="primary-btn" type="button" @click="goWrite">첫 글 작성하기</button>
+        <button class="primary-btn" type="button" @click="goWrite">글 작성하기</button>
       </div>
     </section>
   </div>
