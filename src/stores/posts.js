@@ -1,6 +1,24 @@
 import { ref, watch } from 'vue'
 
 const STORAGE_KEY = 'localhub-posts'
+const LIKED_KEY = 'localhub-liked-posts'
+
+function loadLikedIds() {
+  try {
+    const stored = localStorage.getItem(LIKED_KEY)
+    if (!stored) return new Set()
+    const parsed = JSON.parse(stored)
+    return new Set(Array.isArray(parsed) ? parsed.map(String) : [])
+  } catch {
+    return new Set()
+  }
+}
+
+const likedPostIds = ref(loadLikedIds())
+
+function saveLikedIds() {
+  localStorage.setItem(LIKED_KEY, JSON.stringify([...likedPostIds.value]))
+}
 
 function normalizePost(post) {
   return {
@@ -21,7 +39,9 @@ function loadPosts() {
     if (!stored) return []
     const parsed = JSON.parse(stored)
     if (!Array.isArray(parsed)) return []
-    return parsed.map(normalizePost)
+    return parsed
+      .filter((post) => !String(post.id ?? '').startsWith('seed-'))
+      .map(normalizePost)
   } catch {
     return []
   }
@@ -76,6 +96,22 @@ export function validatePostPassword(id, password) {
   return post && post.password === password
 }
 
+function editAccessKey(id) {
+  return `localhub-edit-${id}`
+}
+
+export function grantEditAccess(id) {
+  sessionStorage.setItem(editAccessKey(id), '1')
+}
+
+export function hasEditAccess(id) {
+  return sessionStorage.getItem(editAccessKey(id)) === '1'
+}
+
+export function revokeEditAccess(id) {
+  sessionStorage.removeItem(editAccessKey(id))
+}
+
 export function deletePost(id) {
   posts.value = posts.value.filter((item) => item.id !== id)
 }
@@ -87,9 +123,26 @@ export function incrementViews(id) {
   }
 }
 
+export function isPostLiked(id) {
+  return likedPostIds.value.has(String(id))
+}
+
 export function toggleLike(id) {
   const post = getPostById(id)
-  if (post) {
+  if (!post) return false
+
+  const key = String(id)
+  const alreadyLiked = likedPostIds.value.has(key)
+
+  if (alreadyLiked) {
+    likedPostIds.value.delete(key)
+    post.likes = Math.max(0, post.likes - 1)
+  } else {
+    likedPostIds.value.add(key)
     post.likes += 1
   }
+
+  likedPostIds.value = new Set(likedPostIds.value)
+  saveLikedIds()
+  return !alreadyLiked
 }

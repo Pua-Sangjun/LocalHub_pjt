@@ -1,14 +1,20 @@
-import { ref, onMounted, onUnmounted, defineComponent } from 'vue'
+import { computed, defineComponent, onMounted, onUnmounted, ref } from 'vue'
+import { useRouter } from 'vue-router'
 import MapWithPins from '@/components/MapWithPins.vue'
+import { loadAttractions } from '@/utils/attractions'
+import { posts } from '@/stores/posts'
+import { useChatbot } from '@/composables/useChatbot'
 import cityCarousel from '@/assets/images/city_carousel.jpg'
 import hanokCarousel from '@/assets/images/hanok_carousel.jpg'
 import hangangCarousel from '@/assets/images/hangang_carousel.jpg'
 import namsanCarousel from '@/assets/images/namsan_carousel.jpg'
-import {
-  fetchKmaShortTermTemperature,
-  getLatestTmfc,
-  getNearestFutureTmef,
-} from '@/api/weather'
+
+const DATA_STATS = [
+  { label: '관광지', count: 783 },
+  { label: '축제·행사', count: 201 },
+  { label: '여행코스', count: 51 },
+  { label: '문화시설', count: 566 },
+]
 
 export default defineComponent({
   name: 'HomeView',
@@ -16,64 +22,38 @@ export default defineComponent({
     MapWithPins,
   },
   setup() {
-    const posts = ref([
-      { id: 3, title: '서울역 근처 뜨끈한 국밥집 리스트 공유 🍲', date: '오늘' },
-      { id: 2, title: '이번 주말 반포한강공원 야시장 가시는 분?', date: '어제' },
-      { id: 1, title: '남산타워 꿀주차 구역 조용히 풉니다.', date: '3일 전' },
-    ])
+    const router = useRouter()
+    const { openChat } = useChatbot()
+    const previewPlaces = ref([])
+    const mapLoading = ref(true)
 
     const heroSlides = [
       {
         id: 'hangang',
         label: '한강',
-        title: '도시 속 새로운 서울',
-        subtitle: '한강, 도심, 골목을 담은 서울 여행',
         image: hangangCarousel,
       },
       {
         id: 'city',
         label: '도시',
-        title: '도심의 활력, 밤의 서울',
-        subtitle: '서울 도심의 반짝이는 야경을 담다',
         image: cityCarousel,
       },
       {
         id: 'hanok',
         label: '한옥',
-        title: '한옥의 여유를 담다',
-        subtitle: '전통과 모던이 공존하는 서울의 순간',
         image: hanokCarousel,
       },
       {
         id: 'namsan',
         label: '남산',
-        title: '남산에서 보는 서울',
-        subtitle: '숨겨진 전망과 여유로운 산책 코스',
         image: namsanCarousel,
       },
     ]
 
-    const quickAccessCards = [
-      {
-        title: '실시간 축제',
-        description: '서울에서 진행 중인 최신 공연 및 축제를 확인하세요.',
-      },
-      {
-        title: '추천 여행 코스',
-        description: '서울 여행 동선을 고려한 인기 코스 정보를 제공합니다.',
-        accent: true,
-      },
-      {
-        title: '서울 로컬 이야기',
-        description: '현지인이 남긴 생생한 피드로 숨은 명소를 만나보세요.',
-      },
-    ]
+    const latestPosts = computed(() => posts.value.slice(0, 3))
 
     const activeSlide = ref(0)
     const fadingSlide = ref(null)
-    const weather = ref(null)
-    const weatherLoading = ref(false)
-    const weatherError = ref(null)
     let slideInterval = null
     let fadeTimeout = null
 
@@ -92,32 +72,19 @@ export default defineComponent({
     const nextSlide = () => setSlide((activeSlide.value + 1) % heroSlides.length)
     const prevSlide = () => setSlide((activeSlide.value - 1 + heroSlides.length) % heroSlides.length)
 
-    async function loadKmaWeather() {
-      weatherLoading.value = true
-      weatherError.value = null
+    onMounted(async () => {
+      slideInterval = setInterval(nextSlide, 6000)
 
       try {
-        const now = new Date()
-        const tmfc = getLatestTmfc(now)
-        const tmef = getNearestFutureTmef(now, tmfc)
-        const result = await fetchKmaShortTermTemperature({
-          tmfc,
-          tmef,
-          nx: 60,
-          ny: 127,
-          vars: 'TMP',
-        })
-        weather.value = result
-      } catch (err) {
-        weatherError.value = err?.message || '날씨 정보를 불러오지 못했습니다.'
+        const attractions = await loadAttractions()
+        previewPlaces.value = attractions
+          .filter((place) => place.lat && place.lon)
+          .slice(0, 48)
+      } catch (error) {
+        console.error('failed to load map preview places', error)
       } finally {
-        weatherLoading.value = false
+        mapLoading.value = false
       }
-    }
-
-    onMounted(async () => {
-      await loadKmaWeather()
-      slideInterval = setInterval(nextSlide, 6000)
     })
 
     onUnmounted(() => {
@@ -126,31 +93,48 @@ export default defineComponent({
     })
 
     const goToWrite = () => {
-      alert('글쓰기 화면으로 이동')
+      router.push({ name: 'post-write' })
     }
 
     const goToDetail = (id) => {
-      alert(`${id}번 게시글 상세 보기`)
+      router.push({ name: 'post-detail', params: { id } })
+    }
+
+    const goToAttractions = () => {
+      router.push({ name: 'attractions' })
+    }
+
+    const goToBoard = () => {
+      router.push({ name: 'board-list' })
     }
 
     const toggleChat = () => {
-      alert('Netlify Functions 연동 챗봇 창 열기')
+      openChat()
+    }
+
+    function formattedDate(value) {
+      return new Date(value).toLocaleString('ko-KR', {
+        dateStyle: 'medium',
+        timeStyle: 'short',
+      })
     }
 
     return {
-      posts,
+      previewPlaces,
+      mapLoading,
       heroSlides,
-      quickAccessCards,
+      dataStats: DATA_STATS,
+      latestPosts,
       activeSlide,
       fadingSlide,
-      weather,
-      weatherLoading,
-      weatherError,
       nextSlide,
       prevSlide,
       goToWrite,
       goToDetail,
+      goToAttractions,
+      goToBoard,
       toggleChat,
+      formattedDate,
     }
   },
 })

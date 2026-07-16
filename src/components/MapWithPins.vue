@@ -1,40 +1,160 @@
 <template>
-  <div class="map-wrap">
-    <select class="map-controls" v-model="selectedRegion">
-        <option value="">전체</option>
-        <option v-for="r in regions" :key="r" :value="r">{{ r }}</option>
+  <div class="map-wrap" :class="{ tall }">
+    <select
+      v-if="showRegionSelect"
+      class="map-controls"
+      :value="regionModel"
+      @change="onRegionChange"
+    >
+      <option value="">전체</option>
+      <option v-for="r in regionList" :key="r" :value="r">{{ r }}</option>
     </select>
     <div ref="mapEl" class="kakao-map-inner"></div>
   </div>
 </template>
 
 <script setup>
-import { ref, onMounted, watch } from 'vue'
+import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
+import { extractRegion } from '@/utils/attractions'
+
+const props = defineProps({
+  places: { type: Array, default: null },
+  activeId: { type: String, default: '' },
+  region: { type: String, default: '' },
+  showRegionSelect: { type: Boolean, default: true },
+  tall: { type: Boolean, default: false },
+  fitOnUpdate: { type: Boolean, default: false },
+})
+
+const emit = defineEmits(['select', 'marker-select', 'update:region'])
 
 const mapEl = ref(null)
 const map = ref(null)
-const markers = ref([])
-const places = ref([])
+const markerEntries = ref([])
+const markerMap = ref({})
+const infoWindow = ref(null)
+const loadedPlaces = ref([])
 const regions = ref([])
 const selectedRegion = ref('')
+let pendingIdleHandler = null
+let resizeObserver = null
+let lastFittedKey = ''
+let focusSequence = 0
 
-function extractRegion(addr) {
-  if (!addr) return '기타'
-  const normalized = addr.replace(/\s+/g, ' ').trim()
-  const m = normalized.match(/서울(?:특별시)?\s*([가-힣]{2,}구)/)
-  return m ? m[1].replace(/\s+/g, '').trim() : '기타'
+function clearPendingIdle() {
+  if (pendingIdleHandler && map.value) {
+    window.kakao.maps.event.removeListener(map.value, 'idle', pendingIdleHandler)
+    pendingIdleHandler = null
+  }
+}
+
+function getPlacesKey() {
+  return sourcePlaces.value
+    .map((item) => normalizePlace(item).id)
+    .filter(Boolean)
+    .join(',')
+}
+
+function ensureMapInteraction() {
+  if (!map.value) return
+  map.value.setDraggable(true)
+  map.value.setZoomable(true)
+}
+
+function relayoutMap() {
+  if (!map.value) return
+  ensureMapInteraction()
+  map.value.relayout()
+}
+
+const regionModel = computed({
+  get: () => (props.showRegionSelect ? selectedRegion.value : props.region),
+  set: (value) => {
+    if (props.showRegionSelect) {
+      selectedRegion.value = value
+    }
+    emit('update:region', value)
+  },
+})
+
+const sourcePlaces = computed(() => props.places ?? loadedPlaces.value)
+
+const regionList = computed(() => {
+  if (props.places) {
+    return getRegionOptions(props.places)
+  }
+  return regions.value
+})
+
+function getRegionOptions(items) {
+  const set = new Set(items.map((item) => item.region || extractRegion(item.addr1)))
+  return Array.from(set).sort((a, b) => a.localeCompare(b, 'ko'))
+}
+
+function normalizePlace(item) {
+  const lat = Number(item.lat ?? item.mapy)
+  const lon = Number(item.lon ?? item.mapx)
+
+  return {
+    ...item,
+    id: String(item.id ?? item.contentid),
+    region: item.region || extractRegion(item.addr1),
+    lat: Number.isFinite(lat) ? lat : null,
+    lon: Number.isFinite(lon) ? lon : null,
+  }
+}
+
+function escapeHtml(value = '') {
+  return String(value)
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;')
+    .replaceAll("'", '&#39;')
+}
+
+function truncateLabel(title, maxLength = 9) {
+  const text = String(title || '').trim()
+  if (text.length <= maxLength) return text
+  return `${text.slice(0, maxLength)}…`
 }
 
 function clearMarkers() {
-  markers.value.forEach((mk) => {
-    mk.setMap(null)
-  })
-  markers.value = []
+  markerEntries.value.forEach((entry) => entry.overlay.setMap(null))
+  markerEntries.value = []
+  markerMap.value = {}
 }
 
-function createMarker(place) {
-  const position = new window.kakao.maps.LatLng(Number(place.mapy), Number(place.mapx))
-  return new window.kakao.maps.Marker({ position, title: place.title })
+function bindBadgeEvents(element, placeId) {
+  element.addEventListener('click', (event) => {
+    event.stopPropagation()
+    emit('marker-select', placeId)
+  })
+}
+
+function createBadgeMarker(place, { isActive = false } = {}) {
+  const position = new window.kakao.maps.LatLng(place.lat, place.lon)
+  const element = document.createElement('button')
+
+  element.type = 'button'
+  element.className = `lh-map-badge${isActive ? ' is-active' : ''}`
+  element.title = place.title
+  element.innerHTML = `
+    <span class="lh-map-badge__label">${escapeHtml(truncateLabel(place.title))}</span>
+    <span class="lh-map-badge__point" aria-hidden="true"></span>
+  `
+
+  bindBadgeEvents(element, place.id)
+
+  const overlay = new window.kakao.maps.CustomOverlay({
+    position,
+    content: element,
+    xAnchor: 0.5,
+    yAnchor: 1,
+    zIndex: isActive ? 12 : 2,
+  })
+
+  return { overlay, element, placeId: place.id, position }
 }
 
 function getRegionBounds(region) {
@@ -87,129 +207,386 @@ function isValidCoords(lat, lon, region) {
   )
 }
 
+function buildInfoContent(place) {
+  const image = place.firstimage
+    ? `<img src="${place.firstimage}" alt="" class="map-info-image" />`
+    : ''
+
+  return `
+    <div class="map-info-window">
+      ${image}
+      <strong>${place.title}</strong>
+      <p>${place.addr1 || ''}</p>
+    </div>
+  `
+}
+
+function openInfoWindow(place) {
+  if (!map.value || !place?.lat || !place?.lon) return
+
+  const position = new window.kakao.maps.LatLng(place.lat, place.lon)
+
+  if (!infoWindow.value) {
+    infoWindow.value = new window.kakao.maps.InfoWindow({ removable: true })
+  }
+
+  infoWindow.value.setContent(buildInfoContent(place))
+  infoWindow.value.setPosition(position)
+  infoWindow.value.open(map.value)
+}
+
+const FOCUS_LEVEL = 3
+const FOCUS_DURATION = 800
+
+function moveMapToPlace(place, onComplete) {
+  if (!map.value || !place?.lat || !place?.lon) return
+
+  const sequence = ++focusSequence
+  const position = new window.kakao.maps.LatLng(place.lat, place.lon)
+
+  if (infoWindow.value) {
+    infoWindow.value.close()
+  }
+
+  clearPendingIdle()
+
+  map.value.setCenter(map.value.getCenter())
+
+  pendingIdleHandler = () => {
+    if (sequence !== focusSequence) return
+    clearPendingIdle()
+    map.value.relayout()
+    if (sequence === focusSequence) {
+      onComplete?.()
+    }
+  }
+
+  window.kakao.maps.event.addListener(map.value, 'idle', pendingIdleHandler)
+
+  if (typeof map.value.jump === 'function') {
+    map.value.jump(position, FOCUS_LEVEL, {
+      animate: { duration: FOCUS_DURATION },
+    })
+    return
+  }
+
+  map.value.panTo(position, {
+    animate: { duration: FOCUS_DURATION },
+  })
+  map.value.setLevel(FOCUS_LEVEL, { animate: true })
+}
+
 async function loadPlaces() {
+  if (props.places) return
+
   try {
     const res = await fetch('/data/서울_관광지.json')
     const json = await res.json()
-    places.value = (json.items || [])
-      .map((it) => {
-        const region = extractRegion(it.addr1)
-        const lat = Number(it.mapy)
-        const lon = Number(it.mapx)
-        return {
-          ...it,
-          region,
-          lat,
-          lon,
-        }
-      })
-      .filter((p) => p.contentid)
+    loadedPlaces.value = (json.items || [])
+      .map(normalizePlace)
+      .filter((place) => place.id)
 
     const set = new Set()
-    places.value.forEach((p) => set.add(p.region))
-    regions.value = Array.from(set).sort()
-
-    console.log('[MapWithPins] loaded places', places.value.length, 'regions', regions.value.length)
-  } catch (e) {
-    console.error('failed to load places', e)
+    loadedPlaces.value.forEach((place) => set.add(place.region))
+    regions.value = Array.from(set).sort((a, b) => a.localeCompare(b, 'ko'))
+  } catch (error) {
+    console.error('failed to load places', error)
   }
 }
 
-function renderMarkers() {
-  clearMarkers()
-
-  const filtered = selectedRegion.value
-    ? places.value.filter((p) => p.region === selectedRegion.value)
-    : places.value
-
-  const uniqueFilter = []
-  const seenIds = new Set()
-  filtered.forEach((p) => {
-    if (!p.contentid) return
-    if (seenIds.has(p.contentid)) return
-    seenIds.add(p.contentid)
-    uniqueFilter.push(p)
+function updateMarkerHighlight(activeId = props.activeId) {
+  Object.entries(markerMap.value).forEach(([placeId, entry]) => {
+    const isActive = placeId === activeId
+    entry.element.classList.toggle('is-active', isActive)
+    entry.overlay.setZIndex(isActive ? 12 : 2)
   })
+}
 
-  console.log(
-    '[MapWithPins] renderMarkers selectedRegion=',
-    selectedRegion.value,
-    'filteredCount=',
-    filtered.length,
-    'uniqueCount=',
-    uniqueFilter.length,
-  )
+function renderMarkers({ preserveView = false, fitBounds = !preserveView } = {}) {
+  if (!map.value) return
+
+  clearMarkers()
+  if (infoWindow.value) infoWindow.value.close()
+
+  const activeRegion = regionModel.value
+  const isExternallyFiltered = props.places != null
+  const uniquePlaces = []
+  const seenIds = new Set()
+
+  sourcePlaces.value.forEach((item) => {
+    const place = normalizePlace(item)
+    if (!place.id || seenIds.has(place.id)) return
+    seenIds.add(place.id)
+    uniquePlaces.push(place)
+  })
 
   const bounds = new window.kakao.maps.LatLngBounds()
-  const validPlaces = uniqueFilter.filter((p) => {
-    if (!Number.isFinite(p.lat) || !Number.isFinite(p.lon)) {
-      console.warn('[MapWithPins] skipped invalid coord', {
-        title: p.title,
-        addr1: p.addr1,
-        region: p.region,
-        lat: p.lat,
-        lon: p.lon,
-      })
-      return false
-    }
-    const region = selectedRegion.value || p.region
-    if (!isValidCoords(p.lat, p.lon, region)) {
-      console.warn('[MapWithPins] skipped out-of-region coord', {
-        title: p.title,
-        addr1: p.addr1,
-        region,
-        lat: p.lat,
-        lon: p.lon,
-      })
-      return false
-    }
-    return true
+  let hasBounds = false
+
+  uniquePlaces.forEach((place) => {
+    if (!Number.isFinite(place.lat) || !Number.isFinite(place.lon)) return
+
+    const region = activeRegion || place.region
+    if (!isExternallyFiltered && activeRegion && place.region !== activeRegion) return
+    if (!isValidCoords(place.lat, place.lon, region)) return
+
+    const entry = createBadgeMarker(place, { isActive: place.id === props.activeId })
+    entry.overlay.setMap(map.value)
+
+    markerEntries.value.push(entry)
+    markerMap.value[place.id] = entry
+    bounds.extend(entry.position)
+    hasBounds = true
   })
 
-  validPlaces.forEach((p) => {
-    const mk = createMarker(p)
-    mk.setMap(map.value)
-    markers.value.push(mk)
-    bounds.extend(mk.getPosition())
-  })
-
-  if (markers.value.length) {
-    map.value.setBounds(bounds)
-  } else {
-    map.value.setCenter(new window.kakao.maps.LatLng(37.5665, 126.9780))
-    map.value.setLevel(4)
+  if (fitBounds) {
+    if (hasBounds) {
+      map.value.setBounds(bounds, 48, 48, 48, 48)
+      lastFittedKey = getPlacesKey()
+    } else {
+      map.value.setCenter(new window.kakao.maps.LatLng(37.5665, 126.978))
+      map.value.setLevel(4)
+      lastFittedKey = ''
+    }
   }
 
-  const visibleTitles = markers.value.map((m) => m.getTitle())
-  if (visibleTitles.includes('백범광장(백범 김구선생 동상)') || visibleTitles.includes('신사공원')) {
-    console.warn('[MapWithPins] currently visible markers include special items', {
-      selectedRegion: selectedRegion.value,
-      visibleTitles,
-    })
-  }
+  updateMarkerHighlight()
+  ensureMapInteraction()
 }
 
+function focusPlace(place, { showInfo = false } = {}) {
+  const normalized = normalizePlace(place)
+  if (!normalized.lat || !normalized.lon) return
+
+  moveMapToPlace(normalized, () => {
+    if (showInfo) openInfoWindow(normalized)
+  })
+}
+
+function focusById(id, options = {}) {
+  const place = sourcePlaces.value
+    .map(normalizePlace)
+    .find((item) => item.id === id)
+
+  if (place) focusPlace(place, options)
+}
+
+function onRegionChange(event) {
+  regionModel.value = event.target.value
+}
+
+watch(
+  () => [getPlacesKey(), regionModel.value],
+  () => {
+    const shouldFit = props.fitOnUpdate && getPlacesKey() !== lastFittedKey
+    renderMarkers({ fitBounds: shouldFit || !lastFittedKey })
+  },
+)
+
+watch(
+  () => props.activeId,
+  (id) => {
+    updateMarkerHighlight(id)
+    if (id) {
+      focusById(id)
+    }
+  },
+)
+
 onMounted(async () => {
-  if (!window.kakao || !window.kakao.maps) {
+  if (!window.kakao?.maps) {
     console.error('Kakao Maps SDK not available')
     return
   }
-  map.value = new window.kakao.maps.Map(mapEl.value, {
-    center: new window.kakao.maps.LatLng(37.5665, 126.9780),
-    level: 4,
+
+  const mapReady = new Promise((resolve) => {
+    const initMap = () => {
+      map.value = new window.kakao.maps.Map(mapEl.value, {
+        center: new window.kakao.maps.LatLng(37.5665, 126.978),
+        level: 4,
+        draggable: true,
+        scrollwheel: true,
+      })
+
+      if (mapEl.value && typeof ResizeObserver !== 'undefined') {
+        resizeObserver = new ResizeObserver(() => {
+          relayoutMap()
+        })
+        resizeObserver.observe(mapEl.value)
+      }
+
+      resolve()
+    }
+
+    if (typeof window.kakao.maps.load === 'function') {
+      window.kakao.maps.load(initMap)
+    } else {
+      initMap()
+    }
   })
 
+  await mapReady
   await loadPlaces()
-  renderMarkers()
+  renderMarkers({ fitBounds: true })
+
+  if (props.activeId) {
+    focusById(props.activeId)
+  }
 })
 
-watch(selectedRegion, () => {
-  renderMarkers()
+onUnmounted(() => {
+  clearPendingIdle()
+  resizeObserver?.disconnect()
+  resizeObserver = null
 })
+
+defineExpose({ focusPlace, focusById })
 </script>
 
 <style scoped>
-.map-wrap { position: relative; height: 460px; }
-.map-controls { position: absolute; top: 12px; left: 12px; z-index: 50; background: rgba(255,255,255,0.9); padding:6px 8px; border-radius:6px; box-shadow:0 2px 8px rgba(0,0,0,0.08); font-size:14px }
-.kakao-map-inner { width: 100%; height: 100%; border-radius:12px; }
+.map-wrap {
+  position: relative;
+  height: 460px;
+}
+
+.map-wrap.tall {
+  height: 640px;
+  min-height: 640px;
+}
+
+.map-controls {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  z-index: 50;
+  background: rgba(255, 255, 255, 0.9);
+  padding: 6px 8px;
+  border-radius: 6px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  font-size: 14px;
+}
+
+.kakao-map-inner {
+  width: 100%;
+  height: 100%;
+  border-radius: 12px;
+}
+
+@media (max-width: 900px) {
+  .map-wrap {
+    height: 380px;
+  }
+
+  .map-wrap.tall {
+    height: 420px;
+    min-height: 420px;
+  }
+}
+
+@media (max-width: 640px) {
+  .map-wrap {
+    height: 300px;
+  }
+
+  .map-wrap.tall {
+    height: 320px;
+    min-height: 320px;
+  }
+
+  .map-controls {
+    top: 8px;
+    left: 8px;
+    max-width: calc(100% - 16px);
+    font-size: 12px;
+  }
+}
+</style>
+
+<style>
+.map-info-window {
+  width: 220px;
+  padding: 4px 2px 2px;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Noto Sans KR', sans-serif;
+}
+
+.map-info-window strong {
+  display: block;
+  margin-bottom: 6px;
+  color: #0f172a;
+  font-size: 0.95rem;
+}
+
+.map-info-window p {
+  margin: 0;
+  color: #64748b;
+  font-size: 0.78rem;
+  line-height: 1.5;
+}
+
+.map-info-image {
+  width: 100%;
+  height: 110px;
+  object-fit: cover;
+  border-radius: 8px;
+  margin-bottom: 8px;
+}
+
+.lh-map-badge {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 5px;
+  margin: 0;
+  padding: 0;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  pointer-events: auto;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Noto Sans KR', sans-serif;
+  transform: translateY(-2px);
+  transition: transform 0.15s ease;
+}
+
+.lh-map-badge__label {
+  display: block;
+  max-width: 124px;
+  padding: 6px 12px;
+  border-radius: 999px;
+  background: #fff;
+  border: 1.5px solid #8fd3ff;
+  color: #1a5fa0;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.25;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  box-shadow: 0 8px 18px rgba(15, 23, 42, 0.14);
+}
+
+.lh-map-badge__point {
+  display: block;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #3b82f6;
+  border: 2px solid #fff;
+  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.22);
+}
+
+.lh-map-badge.is-active {
+  transform: translateY(-4px) scale(1.04);
+}
+
+.lh-map-badge.is-active .lh-map-badge__label {
+  background: #0f172a;
+  border-color: #0f172a;
+  color: #fff;
+}
+
+.lh-map-badge.is-active .lh-map-badge__point {
+  width: 12px;
+  height: 12px;
+  background: #0f172a;
+}
 </style>
