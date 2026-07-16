@@ -8,7 +8,7 @@
       </p>
       <div class="board-hero-row">
         <div>
-          <h1>지역 게시판</h1>
+          <h1>로컬 이야기</h1>
           <p class="board-description">
             본인만의 서울 정보를 마음껏 올려주세요!
           </p>
@@ -63,7 +63,7 @@
       <div v-else class="empty-state">
         <span class="empty-icon" aria-hidden="true">💬</span>
         <p v-if="query">검색 결과가 없습니다.</p>
-        <p v-else>아직 글이 없습니다. 첫 로컬 팁을 남겨보세요!</p>
+        <p v-else>아직 글이 없습니다. 첫 글을 남겨보세요!</p>
         <button class="primary-btn" type="button" @click="goWrite">글 작성하기</button>
       </div>
     </section>
