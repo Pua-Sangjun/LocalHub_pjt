@@ -77,6 +77,7 @@ function handleClick(event) {
   position: relative;
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   gap: 6px;
   border: 1px solid #e2e8f0;
   background: #fff;
@@ -86,16 +87,20 @@ function handleClick(event) {
   font-size: 0.88rem;
   font-weight: 700;
   font-family: inherit;
+  line-height: 1;
   cursor: pointer;
   transition: border-color 0.2s ease, background-color 0.2s ease, color 0.2s ease;
 }
 
 .like-btn.compact {
-  padding: 4px 10px;
+  padding: 4px 8px;
   font-size: 0.8rem;
-  gap: 5px;
+  font-weight: 600;
+  gap: 4px;
   background: transparent;
-  border-color: transparent;
+  border: none;
+  border-radius: 8px;
+  color: #94a3b8;
 }
 
 .like-btn:hover {
@@ -106,6 +111,7 @@ function handleClick(event) {
 
 .like-btn.compact:hover {
   background: #fff1f2;
+  color: #e11d48;
 }
 
 .like-heart-wrap {
@@ -113,19 +119,25 @@ function handleClick(event) {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 20px;
-  height: 20px;
-}
-
-.like-btn.compact .like-heart-wrap {
+  flex-shrink: 0;
   width: 18px;
   height: 18px;
 }
 
+.like-btn.compact .like-heart-wrap {
+  width: 14px;
+  height: 14px;
+}
+
 .like-heart {
+  display: block;
   width: 100%;
   height: 100%;
   overflow: visible;
+}
+
+.like-btn.compact .like-heart {
+  transform: translateY(-0.5px);
 }
 
 .like-heart-fill {
@@ -143,6 +155,16 @@ function handleClick(event) {
   border-color: #fecaca;
   background: #fff1f2;
   color: #e11d48;
+}
+
+.like-btn.compact.liked {
+  border: none;
+  background: transparent;
+  color: #e11d48;
+}
+
+.like-btn.compact.liked:hover {
+  background: #fff1f2;
 }
 
 .like-btn.liked .like-heart-outline {
@@ -176,8 +198,8 @@ function handleClick(event) {
 }
 
 .like-count {
-  min-width: 0.75rem;
   line-height: 1;
+  font-variant-numeric: tabular-nums;
 }
 
 @keyframes heart-pop {

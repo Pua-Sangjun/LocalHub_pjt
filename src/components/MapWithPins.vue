@@ -9,13 +9,18 @@
       <option value="">전체</option>
       <option v-for="r in regionList" :key="r" :value="r">{{ r }}</option>
     </select>
-    <div ref="mapEl" class="kakao-map-inner"></div>
+    <div ref="mapEl" class="kakao-map-inner" :class="{ hidden: mapError }"></div>
+    <div v-if="mapError" class="map-error">
+      <p>{{ mapError }}</p>
+      <small>Netlify 환경변수에 VITE_KAKAO_JAVASCRIPT_KEY를 등록하고, 카카오 개발자 콘솔에 배포 도메인을 추가한 뒤 재배포해 주세요.</small>
+    </div>
   </div>
 </template>
 
 <script setup>
 import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { extractRegion } from '@/utils/attractions'
+import { loadKakaoMapsSdk } from '@/utils/kakaoMaps'
 
 const props = defineProps({
   places: { type: Array, default: null },
@@ -29,6 +34,7 @@ const props = defineProps({
 const emit = defineEmits(['select', 'marker-select', 'update:region'])
 
 const mapEl = ref(null)
+const mapError = ref('')
 const map = ref(null)
 const markerEntries = ref([])
 const markerMap = ref({})
@@ -394,43 +400,32 @@ watch(
 )
 
 onMounted(async () => {
-  if (!window.kakao?.maps) {
-    console.error('Kakao Maps SDK not available')
-    return
-  }
+  try {
+    await loadKakaoMapsSdk()
 
-  const mapReady = new Promise((resolve) => {
-    const initMap = () => {
-      map.value = new window.kakao.maps.Map(mapEl.value, {
-        center: new window.kakao.maps.LatLng(37.5665, 126.978),
-        level: 4,
-        draggable: true,
-        scrollwheel: true,
+    map.value = new window.kakao.maps.Map(mapEl.value, {
+      center: new window.kakao.maps.LatLng(37.5665, 126.978),
+      level: 4,
+      draggable: true,
+      scrollwheel: true,
+    })
+
+    if (mapEl.value && typeof ResizeObserver !== 'undefined') {
+      resizeObserver = new ResizeObserver(() => {
+        relayoutMap()
       })
-
-      if (mapEl.value && typeof ResizeObserver !== 'undefined') {
-        resizeObserver = new ResizeObserver(() => {
-          relayoutMap()
-        })
-        resizeObserver.observe(mapEl.value)
-      }
-
-      resolve()
+      resizeObserver.observe(mapEl.value)
     }
 
-    if (typeof window.kakao.maps.load === 'function') {
-      window.kakao.maps.load(initMap)
-    } else {
-      initMap()
+    await loadPlaces()
+    renderMarkers({ fitBounds: true })
+
+    if (props.activeId) {
+      focusById(props.activeId)
     }
-  })
-
-  await mapReady
-  await loadPlaces()
-  renderMarkers({ fitBounds: true })
-
-  if (props.activeId) {
-    focusById(props.activeId)
+  } catch (error) {
+    mapError.value = error?.message || '지도를 불러오지 못했습니다.'
+    console.error('Kakao Maps init failed:', error)
   }
 })
 
@@ -470,6 +465,38 @@ defineExpose({ focusPlace, focusById })
   width: 100%;
   height: 100%;
   border-radius: 12px;
+}
+
+.kakao-map-inner.hidden {
+  visibility: hidden;
+}
+
+.map-error {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 24px;
+  text-align: center;
+  background: #f8fafc;
+  border: 1px dashed #cbd5e1;
+  border-radius: 12px;
+  color: #475569;
+}
+
+.map-error p {
+  margin: 0;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.map-error small {
+  max-width: 320px;
+  line-height: 1.5;
+  color: #64748b;
 }
 
 @media (max-width: 900px) {

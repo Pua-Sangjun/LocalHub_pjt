@@ -330,9 +330,14 @@ function formattedDate(value) {
 .post-meta {
   display: flex;
   flex-wrap: wrap;
+  align-items: center;
   gap: 10px;
   color: #94a3b8;
   font-size: 0.8rem;
+}
+
+.post-meta :deep(.like-btn) {
+  margin-left: auto;
 }
 
 .empty-state {

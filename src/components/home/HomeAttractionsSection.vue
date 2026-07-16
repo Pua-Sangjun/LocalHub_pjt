@@ -290,7 +290,7 @@ const attractions = ref([])
 const loading = ref(true)
 const error = ref(null)
 const selectedCategory = ref('all')
-const selectedSort = ref('recommended')
+const selectedSort = ref('updated')
 const selectedRegion = ref('')
 const keyword = ref('')
 const currentPage = ref(1)
@@ -327,7 +327,7 @@ const mapPlaces = computed(() => pageItems.value)
 
 const hasActiveFilters = computed(
   () =>
-    selectedSort.value !== 'recommended' ||
+    selectedSort.value !== 'updated' ||
     selectedRegion.value !== '' ||
     keyword.value.trim() !== '',
 )

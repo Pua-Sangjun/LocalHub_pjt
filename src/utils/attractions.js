@@ -8,7 +8,6 @@ const CATEGORY_FILTERS = [
 ]
 
 const SORT_OPTIONS = [
-  { id: 'recommended', label: '추천순' },
   { id: 'updated', label: '업데이트순' },
   { id: 'name', label: '가나다순' },
 ]
@@ -91,14 +90,7 @@ export function sortAttractions(items, sortBy) {
     return list.sort((a, b) => a.title.localeCompare(b.title, 'ko'))
   }
 
-  if (sortBy === 'updated') {
-    return list.sort((a, b) => Number(b.modifiedtime || 0) - Number(a.modifiedtime || 0))
-  }
-
-  return list.sort((a, b) => {
-    if (a.hasImage !== b.hasImage) return a.hasImage ? -1 : 1
-    return Number(b.modifiedtime || 0) - Number(a.modifiedtime || 0)
-  })
+  return list.sort((a, b) => Number(b.modifiedtime || 0) - Number(a.modifiedtime || 0))
 }
 
 export function paginateItems(items, page, pageSize) {
