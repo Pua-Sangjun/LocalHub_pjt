@@ -155,76 +155,115 @@
           </div>
 
           <div v-else class="attraction-grid">
-            <button
+            <article
               v-for="place in pageItems"
               :key="place.id"
               :id="`attraction-${place.id}`"
-              type="button"
               class="attraction-card"
-              :class="{
-                active: activeId === place.id,
-              }"
-              @click="selectPlaceFromCard(place.id)"
+              :class="{ active: activeId === place.id }"
             >
-              <div class="card-image-wrap">
-                <div
-                  v-if="shouldShowImageSkeleton(place)"
-                  class="skeleton-block skeleton-image-fill"
-                ></div>
-                <img
-                  v-if="place.firstimage && !isImageFailed(place.id)"
-                  :ref="(el) => registerImage(el, place.id)"
-                  :src="place.firstimage"
-                  :alt="place.title"
-                  :class="{ 'is-loaded': shouldShowImage(place) }"
-                  @load="markImageLoaded(place.id)"
-                  @error="onImageError(place.id)"
-                />
-                <div
-                  v-else-if="shouldShowImageEmpty(place)"
-                  class="image-fallback image-empty"
-                >
-                  <span class="image-empty-icon" aria-hidden="true">📷</span>
-                  <span class="image-empty-text">이미지 없음</span>
+              <button
+                type="button"
+                class="attraction-card-main"
+                @click="selectPlaceFromCard(place.id)"
+              >
+                <div class="card-image-wrap">
+                  <div
+                    v-if="shouldShowImageSkeleton(place)"
+                    class="skeleton-block skeleton-image-fill"
+                  ></div>
+                  <img
+                    v-if="place.firstimage && !isImageFailed(place.id)"
+                    :ref="(el) => registerImage(el, place.id)"
+                    :src="place.firstimage"
+                    :alt="place.title"
+                    :class="{ 'is-loaded': shouldShowImage(place) }"
+                    @load="markImageLoaded(place.id)"
+                    @error="onImageError(place.id)"
+                  />
+                  <div
+                    v-else-if="shouldShowImageEmpty(place)"
+                    class="image-fallback image-empty"
+                  >
+                    <span class="image-empty-icon" aria-hidden="true">📷</span>
+                    <span class="image-empty-text">이미지 없음</span>
+                  </div>
                 </div>
-              </div>
-              <div class="card-body">
-                <h3>{{ place.title }}</h3>
-                <p>{{ place.addr1 }}</p>
-                <span class="card-region">{{ place.region }}</span>
-              </div>
-            </button>
+                <div class="card-body">
+                  <h3>{{ place.title }}</h3>
+                  <p>{{ place.addr1 }}</p>
+                  <span class="card-region">{{ place.region }}</span>
+                </div>
+              </button>
+              <ShareButton
+                mode="attraction"
+                :place="place"
+                compact
+                button-class="card-share-btn"
+              />
+            </article>
           </div>
 
           <nav v-if="totalPages > 1" class="pagination" aria-label="페이지네이션">
-            <button type="button" :disabled="currentPage === 1" @click="goToPage(1)">처음</button>
-            <button type="button" :disabled="currentPage === 1" @click="goToPage(currentPage - 1)">
-              이전
-            </button>
-            <button
-              v-for="page in visiblePages"
-              :key="page"
-              type="button"
-              class="page-number"
-              :class="{ active: page === currentPage }"
-              @click="goToPage(page)"
-            >
-              {{ page }}
-            </button>
-            <button
-              type="button"
-              :disabled="currentPage === totalPages"
-              @click="goToPage(currentPage + 1)"
-            >
-              다음
-            </button>
-            <button
-              type="button"
-              :disabled="currentPage === totalPages"
-              @click="goToPage(totalPages)"
-            >
-              마지막
-            </button>
+            <template v-if="isCompactPagination">
+              <button
+                type="button"
+                class="pagination-nav"
+                :disabled="currentPage === 1"
+                @click="goToPage(currentPage - 1)"
+              >
+                이전
+              </button>
+              <span class="pagination-meta">{{ currentPage }} / {{ totalPages }}</span>
+              <button
+                type="button"
+                class="pagination-nav"
+                :disabled="currentPage === totalPages"
+                @click="goToPage(currentPage + 1)"
+              >
+                다음
+              </button>
+            </template>
+
+            <template v-else>
+              <button type="button" class="pagination-edge" :disabled="currentPage === 1" @click="goToPage(1)">
+                처음
+              </button>
+              <button
+                type="button"
+                class="pagination-nav"
+                :disabled="currentPage === 1"
+                @click="goToPage(currentPage - 1)"
+              >
+                이전
+              </button>
+              <button
+                v-for="page in visiblePages"
+                :key="page"
+                type="button"
+                class="page-number"
+                :class="{ active: page === currentPage }"
+                @click="goToPage(page)"
+              >
+                {{ page }}
+              </button>
+              <button
+                type="button"
+                class="pagination-nav"
+                :disabled="currentPage === totalPages"
+                @click="goToPage(currentPage + 1)"
+              >
+                다음
+              </button>
+              <button
+                type="button"
+                class="pagination-edge"
+                :disabled="currentPage === totalPages"
+                @click="goToPage(totalPages)"
+              >
+                마지막
+              </button>
+            </template>
           </nav>
         </div>
       </div>
@@ -233,8 +272,9 @@
 </template>
 
 <script setup>
-import { ref, computed, watch, onMounted, nextTick } from 'vue'
+import { ref, computed, watch, onMounted, onUnmounted, nextTick } from 'vue'
 import MapWithPins from '@/components/MapWithPins.vue'
+import ShareButton from '@/components/ShareButton.vue'
 import {
   CATEGORY_FILTERS,
   SORT_OPTIONS,
@@ -259,6 +299,8 @@ const currentPage = ref(1)
 const activeId = ref('')
 const filtersExpanded = ref(false)
 const gridLoading = ref(false)
+const isCompactPagination = ref(false)
+let paginationMediaQuery = null
 const loadedImageIds = ref(new Set())
 const failedImageIds = ref(new Set())
 
@@ -390,12 +432,10 @@ async function changePage(page, options = {}) {
 
 function selectPlaceFromCard(id) {
   activeId.value = id
-  mapRef.value?.focusById(id)
 }
 
 function selectPlaceFromStrip(id) {
   activeId.value = id
-  mapRef.value?.focusById(id)
 }
 
 function selectPlaceFromMarker(id) {
@@ -407,7 +447,15 @@ async function goToPage(page) {
   await changePage(page)
 }
 
+function updatePaginationMode(event) {
+  isCompactPagination.value = event.matches
+}
+
 onMounted(async () => {
+  paginationMediaQuery = window.matchMedia('(max-width: 640px)')
+  updatePaginationMode(paginationMediaQuery)
+  paginationMediaQuery.addEventListener('change', updatePaginationMode)
+
   try {
     attractions.value = await loadAttractions()
     await nextTick()
@@ -417,6 +465,10 @@ onMounted(async () => {
   } finally {
     loading.value = false
   }
+})
+
+onUnmounted(() => {
+  paginationMediaQuery?.removeEventListener('change', updatePaginationMode)
 })
 </script>
 

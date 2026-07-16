@@ -22,7 +22,6 @@
       <span class="logo-wordmark">
         <span class="logo-local">Local</span><span class="logo-hub">Hub</span>
       </span>
-      <span class="logo-tagline">서울 로컬, 함께 나누다</span>
     </div>
   </div>
 </template>

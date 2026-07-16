@@ -6,6 +6,7 @@ import BoardListView from '@/views/BoardListView.vue'
 import PostDetailView from '@/views/PostDetailView.vue'
 import PostFormView from '@/views/PostFormView.vue'
 import MapView from '@/views/MapView.vue'
+import AttractionDetailView from '@/views/AttractionDetailView.vue'
 
 const routes = [
   {
@@ -13,6 +14,12 @@ const routes = [
     component: AppLayout,
     children: [
       { path: '', name: 'home', component: HomeView, meta: { header: 'hero' } },
+      {
+        path: 'attractions/:id',
+        name: 'attraction-detail',
+        component: AttractionDetailView,
+        meta: { header: 'solid' },
+      },
       {
         path: 'attractions',
         name: 'attractions',

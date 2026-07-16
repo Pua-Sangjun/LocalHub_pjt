@@ -125,4 +125,9 @@ export function getRegionOptions(items) {
   return Array.from(regions).sort((a, b) => a.localeCompare(b, 'ko'))
 }
 
+export async function loadAttractionById(id) {
+  const items = await loadAttractions()
+  return items.find((item) => item.id === String(id)) || null
+}
+
 export { CATEGORY_FILTERS, SORT_OPTIONS }

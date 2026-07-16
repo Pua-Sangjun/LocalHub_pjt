@@ -90,6 +90,7 @@
 <script setup>
 import { computed, nextTick, onMounted, ref } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
+import ShareButton from '@/components/ShareButton.vue'
 import {
   getPostById,
   incrementViews,
