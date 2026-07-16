@@ -13,18 +13,10 @@
             <div class="slide-overlay">
               <div class="hero-banner-copy">
                 <span class="eyebrow">{{ slide.label }} · 서울</span>
-                <h1 class="hero-title">회원가입 없이, 서울 로컬을 탐색하세요</h1>
+                <h1 class="hero-title">서울 로컬을 탐색하세요</h1>
                 <p class="hero-description">
-                  공공데이터 기반 관광 정보, 익명 피드, AI 챗봇을 한곳에서 만나보세요.
+                  공공데이터 기반 관광 정보를 한곳에서 만나보세요.
                 </p>
-                <div class="hero-actions">
-                  <button class="primary-btn" type="button" @click="goToAttractions">
-                    관광지·지도 보기
-                  </button>
-                  <button class="secondary-btn" type="button" @click="goToBoard">
-                    익명 피드 보기
-                  </button>
-                </div>
               </div>
             </div>
           </div>
