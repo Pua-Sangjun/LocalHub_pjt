@@ -29,33 +29,19 @@
             <div :class="['chat-bubble', item.role]">
               <span class="bubble-label">{{ item.role === 'user' ? '나' : '챗봇' }}</span>
               <div v-if="item.role === 'bot'" class="message-body">
-                <template v-for="(block, blockIndex) in formatMessageBlocks(item.text)" :key="`${item.text}-${blockIndex}`">
-                  <p v-if="block.type === 'paragraph'" class="message-paragraph">
+                <template
+                  v-for="(block, blockIndex) in formatMessageBlocks(item.text)"
+                  :key="`${index}-${blockIndex}`"
+                >
+                  <p class="message-line" :class="{ 'message-heading': block.icon === '✨' }">
                     <span class="message-icon">{{ block.icon }}</span>
-                    <span v-for="(segment, segmentIndex) in block.segments" :key="`${blockIndex}-${segmentIndex}`">
-                      <strong v-if="segment.bold">{{ segment.text }}</strong>
-                      <template v-else>{{ segment.text }}</template>
-                    </span>
-                  </p>
-                  <p v-else-if="block.type === 'heading'" class="message-heading">
-                    <span class="message-icon">{{ block.icon }}</span>
-                    <span v-for="(segment, segmentIndex) in block.segments" :key="`${blockIndex}-${segmentIndex}`">
-                      <strong v-if="segment.bold">{{ segment.text }}</strong>
-                      <template v-else>{{ segment.text }}</template>
-                    </span>
-                  </p>
-                  <div v-else-if="block.type === 'bullet' || block.type === 'number'" class="message-entry">
-                    <div class="message-entry-title">
-                      <span class="message-icon">{{ block.icon }}</span>
-                      <span v-for="(segment, segmentIndex) in block.segments" :key="`${blockIndex}-${segmentIndex}`">
+                    <span class="message-text">
+                      <template v-for="(segment, segmentIndex) in block.segments" :key="segmentIndex">
                         <strong v-if="segment.bold">{{ segment.text }}</strong>
                         <template v-else>{{ segment.text }}</template>
-                      </span>
-                    </div>
-                    <div v-if="block.text.includes(':')" class="message-entry-body">
-                      {{ block.text.split(':')[1]?.trim() || '' }}
-                    </div>
-                  </div>
+                      </template>
+                    </span>
+                  </p>
                 </template>
               </div>
               <p v-else>{{ item.text }}</p>
@@ -122,11 +108,11 @@
 import { ref, watch, onMounted, onUnmounted, nextTick } from 'vue'
 import { sendChatMessage } from '@/api/chat'
 import { buildChatContext, SUGGESTED_QUESTIONS } from '@/utils/chatContext'
+import { buildFestivalContext } from '@/utils/festivalReply'
+import { formatChatMessageBlocks } from '@/utils/chatFormatting'
 import { loadTourData } from '@/utils/dataService'
 import { getPosts } from '@/stores/posts'
 import { useChatbot } from '@/composables/useChatbot'
-import { formatChatMessageBlocks } from '@/utils/chatFormatting'
-import { buildFestivalReply } from '@/utils/festivalReply'
 
 const STORAGE_KEY = 'localhub-chat-history'
 
@@ -227,17 +213,17 @@ async function sendQuestion() {
   await scrollToBottom()
 
   try {
-    const festivalReply = buildFestivalReply(text, tourItems.value)
-    let reply = festivalReply
-
-    if (!reply) {
-      const context = buildChatContext(text, tourItems.value, getPosts())
-      reply = await sendChatMessage({
-        message: text,
-        history: toApiHistory().slice(0, -1),
-        context,
-      })
+    if (!tourItems.value.length) {
+      tourItems.value = await loadTourData()
     }
+
+    const festivalContext = buildFestivalContext(text, tourItems.value)
+    const context = festivalContext || buildChatContext(text, tourItems.value, getPosts())
+    const reply = await sendChatMessage({
+      message: text,
+      history: toApiHistory().slice(0, -1),
+      context,
+    })
 
     messages.value.push({ role: 'bot', text: reply })
   } catch (error) {
@@ -278,11 +264,11 @@ function formatMessageBlocks(text) {
   height: 56px;
   border-radius: 50%;
   border: none;
-  background: linear-gradient(135deg, #4f46e5, #6366f1);
-  color: white;
+  background: linear-gradient(135deg, #8fd3ff 0%, #7dd3fc 100%);
+  color: #0f172a;
   font-size: 1.25rem;
   cursor: pointer;
-  box-shadow: 0 12px 30px rgba(79, 70, 229, 0.35);
+  box-shadow: 0 12px 30px rgba(56, 189, 248, 0.28);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -294,12 +280,12 @@ function formatMessageBlocks(text) {
 }
 
 .chat-panel {
-  width: min(760px, calc(100vw - 2rem));
-  max-width: 760px;
-  max-height: min(760px, calc(100vh - 4rem));
+  width: clamp(300px, 32vw, 480px);
+  height: clamp(420px, 72vh, 720px);
+  max-height: calc(100vh - 5rem);
   margin-bottom: 0.75rem;
   background: #ffffff;
-  border-radius: 1.2rem;
+  border-radius: 1.1rem;
   box-shadow: 0 24px 48px rgba(15, 23, 42, 0.18);
   overflow: hidden;
   display: flex;
@@ -312,16 +298,16 @@ function formatMessageBlocks(text) {
   left: 0;
   bottom: 0;
   width: 100%;
-  max-width: none;
-  max-height: 90vh;
+  height: auto;
+  max-height: 88vh;
   margin-bottom: 0;
   border-radius: 1.1rem 1.1rem 0 0;
 }
 
 .chat-header {
   padding: 0.9rem 1rem;
-  background: linear-gradient(135deg, #4f46e5, #4338ca);
-  color: white;
+  background: linear-gradient(135deg, #8fd3ff 0%, #7dd3fc 100%);
+  color: #0f172a;
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -337,7 +323,7 @@ function formatMessageBlocks(text) {
 .chat-header-info p {
   margin: 0.15rem 0 0;
   font-size: 0.75rem;
-  opacity: 0.85;
+  opacity: 0.75;
 }
 
 .chat-avatar {
@@ -351,8 +337,8 @@ function formatMessageBlocks(text) {
 
 .icon-btn {
   border: none;
-  background: rgba(255, 255, 255, 0.15);
-  color: white;
+  background: rgba(15, 23, 42, 0.08);
+  color: #0f172a;
   width: 32px;
   height: 32px;
   border-radius: 8px;
@@ -360,13 +346,13 @@ function formatMessageBlocks(text) {
 }
 
 .chat-body {
-  padding: 1rem 1.15rem;
+  padding: 1rem;
   display: flex;
   flex-direction: column;
-  gap: 0.85rem;
+  gap: 0.75rem;
   overflow-y: auto;
   flex: 1;
-  min-height: 320px;
+  min-height: clamp(200px, 35vh, 360px);
   background: #f8fafc;
 }
 
@@ -403,9 +389,9 @@ function formatMessageBlocks(text) {
 }
 
 .suggestion-chip {
-  border: 1px solid #c7d2fe;
-  background: #eef2ff;
-  color: #3730a3;
+  border: 1px solid #8fd3ff;
+  background: #eef6ff;
+  color: #1a5fa0;
   border-radius: 999px;
   padding: 0.4rem 0.75rem;
   font-size: 0.78rem;
@@ -428,80 +414,59 @@ function formatMessageBlocks(text) {
 }
 
 .chat-bubble {
-  max-width: min(92%, 720px);
-  padding: 0.75rem 0.95rem;
+  max-width: 88%;
+  padding: 0.65rem 0.85rem;
   border-radius: 1rem;
-  font-size: 0.95rem;
-  line-height: 1.6;
-  word-break: break-word;
-  overflow-wrap: anywhere;
+  font-size: 0.9rem;
+  line-height: 1.45;
 }
 
 .chat-bubble p {
   margin: 0.25rem 0 0;
   white-space: pre-wrap;
   word-break: break-word;
-  overflow-wrap: anywhere;
 }
 
 .message-body {
   display: flex;
   flex-direction: column;
-  gap: 0.35rem;
+  gap: 0.3rem;
   margin-top: 0.25rem;
 }
 
-.message-paragraph,
-.message-heading,
-.message-entry-title {
+.message-line {
   margin: 0;
-  line-height: 1.7;
+  line-height: 1.65;
   display: flex;
   align-items: flex-start;
-  gap: 0.35rem;
-  flex-wrap: wrap;
+  gap: 0.4rem;
   white-space: pre-wrap;
-  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
-.message-entry {
-  margin-top: 0.15rem;
-  color: #1e3a8a;
-  display: flex;
-  flex-direction: column;
-  gap: 0.2rem;
-}
-
-.message-entry-title {
+.message-heading .message-text {
   font-weight: 700;
-  color: #1e3a8a;
 }
 
-.message-entry-body {
-  margin-left: 1.3rem;
-  color: #334155;
-  line-height: 1.7;
-  white-space: pre-wrap;
-  overflow-wrap: anywhere;
-}
-
-.message-heading {
+.message-line .message-text strong {
   font-weight: 700;
-  color: #3730a3;
 }
 
 .message-icon {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  margin-top: 0.08rem;
-  font-size: 0.95rem;
   flex-shrink: 0;
+  width: 1.2rem;
+  text-align: center;
+  line-height: 1.65;
+}
+
+.message-text {
+  flex: 1;
+  min-width: 0;
 }
 
 .message-body strong {
-  font-weight: 800;
-  color: #3730a3;
+  font-weight: 700;
+  color: #0f4c81;
 }
 
 .bubble-label {
@@ -511,8 +476,8 @@ function formatMessageBlocks(text) {
 }
 
 .chat-bubble.bot {
-  background: #eef2ff;
-  color: #1e3a8a;
+  background: #eef6ff;
+  color: #1a5fa0;
   border-bottom-left-radius: 0.25rem;
 }
 
@@ -538,7 +503,7 @@ function formatMessageBlocks(text) {
   width: 6px;
   height: 6px;
   border-radius: 50%;
-  background: #6366f1;
+  background: #38bdf8;
   animation: blink 1.2s infinite;
 }
 
@@ -577,8 +542,8 @@ function formatMessageBlocks(text) {
 }
 
 .chat-input-area input:focus {
-  border-color: #6366f1;
-  box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.15);
+  border-color: #8fd3ff;
+  box-shadow: 0 0 0 2px rgba(143, 211, 255, 0.35);
 }
 
 .send-btn {
@@ -586,8 +551,8 @@ function formatMessageBlocks(text) {
   height: 42px;
   padding: 0 1rem;
   border: none;
-  background: #4f46e5;
-  color: white;
+  background: #8fd3ff;
+  color: #0f172a;
   border-radius: 0.75rem;
   cursor: pointer;
   font-weight: 600;

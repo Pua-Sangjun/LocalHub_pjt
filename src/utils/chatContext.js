@@ -1,3 +1,5 @@
+import { isFestivalNotEnded } from './festivalReply.js'
+
 const SEOUL_DISTRICTS = [
     '종로', '중구', '용산', '성동', '광진', '동대문', '중랑', '성북', '강북', '도봉',
     '노원', '은평', '서대문', '마포', '양천', '강서', '구로', '금천', '영등포', '동작',
@@ -126,8 +128,14 @@ const SEOUL_DISTRICTS = [
     const keywords = extractKeywords(text)
     const districts = detectDistricts(text)
     const intents = detectIntent(text)
-  
-    const rankedTours = tourItems
+    const today = new Date()
+
+    const activeTourItems = tourItems.filter((item) => {
+      if (item.dataType !== '축제공연행사') return true
+      return isFestivalNotEnded(item, today)
+    })
+
+    const rankedTours = activeTourItems
       .map((item) => ({ item, score: scoreTourItem(item, keywords, districts, intents) }))
       .filter(({ score }) => score > 0)
       .sort((a, b) => b.score - a.score)
@@ -149,6 +157,12 @@ const SEOUL_DISTRICTS = [
     if (intents.length) {
       summaryParts.push(`질문 유형: ${intents.join(', ')}`)
     }
+
+    if (intents.includes('festival') || intents.includes('course') || intents.includes('board')) {
+      summaryParts.push(
+        '답변 시 `-` `•` 불릿 없이 이모지만 사용: 🎪축제 🏛️관광지 🏃레포츠 🗺️코스 📅일정 📍장소 💰요금 📝게시글',
+      )
+    }
   
     summaryParts.push(`전체 관광 데이터: ${tourItems.length}건, 커뮤니티 게시글: ${posts.length}건`)
   
@@ -169,7 +183,7 @@ const SEOUL_DISTRICTS = [
     }
   
     if (!rankedTours.length && !rankedPosts.length && districts.length) {
-      const districtFallback = tourItems
+      const districtFallback = activeTourItems
         .filter((item) => matchesDistrict(item, districts))
         .slice(0, 6)
         .map(summarizeTourItem)

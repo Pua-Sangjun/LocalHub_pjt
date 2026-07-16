@@ -1,4 +1,7 @@
-function splitBoldSegments(text = '') {
+const LEADING_EMOJI_PATTERN = /^(\p{Extended_Pictographic}(?:\uFE0F)?(?:\u200D\p{Extended_Pictographic}(?:\uFE0F)?)*)\s*/u
+const LEADING_MARKER_PATTERN = /^[-*•·▪]\s+/
+
+function parseInlineMarkdown(text = '') {
   const segments = []
   const pattern = /\*\*(.+?)\*\*/g
   let lastIndex = 0
@@ -19,72 +22,81 @@ function splitBoldSegments(text = '') {
   return segments.length > 0 ? segments : [{ text, bold: false }]
 }
 
-function autoBoldKeyTerms(text = '') {
-  const terms = [
-    '경복궁', '창덕궁', '창경궁', '덕수궁', '북촌한옥마을', '한강야시장', '청계천',
-    '서울숲', '롯데월드', '남산타워', '국립중앙박물관', '인사동', '광화문',
-    '국립현대미술관', '여의도', '용산', '강남', '홍대', '이태원', '명동', '잠실',
-    '뮤지컬', '페스티벌', '공연', '행사', '전시', '한강',
-  ]
-
-  const uniqueTerms = [...new Set(terms)].sort((a, b) => b.length - a.length)
-  const segments = []
-  let cursor = 0
-
-  while (cursor < text.length) {
-    let nextMatch = null
-
-    uniqueTerms.forEach((term) => {
-      const index = text.indexOf(term, cursor)
-      if (index === -1) return
-      if (!nextMatch || index < nextMatch.index || (index === nextMatch.index && term.length > nextMatch.term.length)) {
-        nextMatch = { index, term }
-      }
-    })
-
-    if (!nextMatch || nextMatch.index > cursor) {
-      const plain = text.slice(cursor, nextMatch ? nextMatch.index : text.length)
-      if (plain) {
-        segments.push({ text: plain, bold: false })
-      }
-      cursor = nextMatch ? nextMatch.index : text.length
-      if (!nextMatch) break
-    }
-
-    if (nextMatch) {
-      segments.push({ text: nextMatch.term, bold: true })
-      cursor = nextMatch.index + nextMatch.term.length
-    }
+function stripLeadingMarkers(text = '') {
+  let value = String(text).trim()
+  while (LEADING_MARKER_PATTERN.test(value)) {
+    value = value.replace(LEADING_MARKER_PATTERN, '')
   }
-
-  return segments.length > 0 ? segments : [{ text, bold: false }]
+  return value.trim()
 }
 
-function parseInlineMarkdown(text = '') {
-  const segments = []
-  const pattern = /\*\*(.+?)\*\*/g
-  let lastIndex = 0
-  let match
-
-  while ((match = pattern.exec(text)) !== null) {
-    if (match.index > lastIndex) {
-      segments.push(...autoBoldKeyTerms(text.slice(lastIndex, match.index)))
-    }
-    segments.push({ text: match[1], bold: true })
-    lastIndex = match.index + match[0].length
-  }
-
-  if (lastIndex < text.length) {
-    segments.push(...autoBoldKeyTerms(text.slice(lastIndex)))
-  }
-
-  return segments.length > 0 ? segments : [{ text, bold: false }]
+function stripLeadingEmoji(text = '') {
+  const match = String(text).match(LEADING_EMOJI_PATTERN)
+  if (!match) return { icon: null, text: String(text).trim() }
+  return { icon: match[1], text: String(text).slice(match[0].length).trim() }
 }
 
-function normalizeEntryText(text = '') {
-  const trimmed = String(text).trim()
-  const withColon = trimmed.replace(/^[-*•]\s*/, '')
-  return withColon.replace(/\s+/g, ' ')
+function pickLineIcon(text = '') {
+  const value = String(text).trim()
+
+  if (/^(일정|기간|날짜)/.test(value) || /\d{4}[./-]\d{1,2}/.test(value) || /\d{1,2}\/\d{1,2}/.test(value)) {
+    return '📅'
+  }
+  if (/^(장소|주소|위치)/.test(value)) {
+    return '📍'
+  }
+  if (/^(요금|입장료|가격|티켓)/.test(value) || /(무료|유료|\d+[,]?\d*원)/.test(value)) {
+    return '💰'
+  }
+  if (/^(연락처|전화|문의)/.test(value) || /\d{2,3}-\d{3,4}-\d{4}/.test(value)) {
+    return '📞'
+  }
+  if (/축제|페스티벌|공연|행사|콘|페어|비치|페스타|마켓/.test(value)) {
+    return '🎪'
+  }
+  if (/관광지|궁|타워|마을|뮤지엄|박물관|미술관|한옥|전망대/.test(value)) {
+    return '🏛️'
+  }
+  if (/여행코스|코스|동선|루트/.test(value)) {
+    return '🗺️'
+  }
+  if (/레포츠|체험|스포츠|서핑|자전거|액티비티/.test(value)) {
+    return '🏃'
+  }
+  if (/게시글|후기|리뷰|커뮤니티|작성/.test(value)) {
+    return '📝'
+  }
+  if (/숙박|호텔|게스트하우스/.test(value)) {
+    return '🏨'
+  }
+  if (/쇼핑|시장|면세/.test(value)) {
+    return '🛍️'
+  }
+  if (/날씨|기온|강수|여행 적합/.test(value)) {
+    return '🌤️'
+  }
+  if (/맛집|음식점|식당/.test(value)) {
+    return '🍽️'
+  }
+
+  return null
+}
+
+function normalizeLineForDisplay(line = '') {
+  let value = stripLeadingMarkers(String(line).trim())
+  const { icon: leadingIcon, text: withoutEmoji } = stripLeadingEmoji(value)
+  const body = stripLeadingMarkers(withoutEmoji)
+  const icon = leadingIcon || pickLineIcon(body)
+
+  return { icon, text: body }
+}
+
+function isIntroLine(text = '') {
+  const value = String(text).trim()
+  return (
+    /(?:추천|안내|모아봤|찾아봤|도와드릴|알려드릴|살펴봤|정리했|도움이)/.test(value)
+    || /(?:입니다|해요|어요|게요|까요|세요|할게요)[.!]?$/.test(value)
+  ) && !/\d{4}[./-]\d{1,2}/.test(value) && !/서울특별시/.test(value)
 }
 
 export function formatChatMessageBlocks(text = '') {
@@ -94,51 +106,41 @@ export function formatChatMessageBlocks(text = '') {
     const line = rawLine.trim()
     if (!line) return blocks
 
-    if (/^[-*•]\s+/.test(line)) {
+    const numbered = line.match(/^\d+\.\s+(.+)/)
+    const content = numbered ? numbered[1] : line
+    const { icon, text: body } = normalizeLineForDisplay(content)
+
+    if (!body) return blocks
+
+    if (/^#{1,3}\s+/.test(body)) {
+      const heading = body.replace(/^#{1,3}\s+/, '')
       blocks.push({
-        type: 'bullet',
-        text: normalizeEntryText(line),
-        icon: '📌',
-        segments: parseInlineMarkdown(normalizeEntryText(line)),
+        type: 'line',
+        text: heading,
+        icon: icon || '✨',
+        segments: parseInlineMarkdown(heading),
       })
       return blocks
     }
 
-    if (/^\d+\.\s+/.test(line)) {
+    if (/^\*\*.+\*\*$/.test(body)) {
       blocks.push({
-        type: 'number',
-        text: normalizeEntryText(line.replace(/^\d+\.\s+/, '')),
-        icon: '🔢',
-        segments: parseInlineMarkdown(normalizeEntryText(line.replace(/^\d+\.\s+/, ''))),
+        type: 'line',
+        text: body.replace(/^\*\*|\*\*$/g, ''),
+        icon: icon || '✨',
+        segments: parseInlineMarkdown(body.replace(/^\*\*|\*\*$/g, '')),
       })
       return blocks
     }
 
-    if (/^#{1,3}\s+/.test(line)) {
-      blocks.push({
-        type: 'heading',
-        text: line.replace(/^#{1,3}\s+/, ''),
-        icon: '✨',
-        segments: parseInlineMarkdown(line.replace(/^#{1,3}\s+/, '')),
-      })
-      return blocks
-    }
-
-    if (/^\*\*.+\*\*$/.test(line)) {
-      blocks.push({
-        type: 'heading',
-        text: line.replace(/^\*\*|\*\*$/g, ''),
-        icon: '✨',
-        segments: parseInlineMarkdown(line.replace(/^\*\*|\*\*$/g, '')),
-      })
-      return blocks
-    }
+    const resolvedIcon =
+      blocks.length === 0 && isIntroLine(body) ? '💬' : icon || '📌'
 
     blocks.push({
-      type: 'paragraph',
-      text: line,
-      icon: '💬',
-      segments: parseInlineMarkdown(line),
+      type: 'line',
+      text: body,
+      icon: resolvedIcon,
+      segments: parseInlineMarkdown(body),
     })
     return blocks
   }, [])
