@@ -16,7 +16,7 @@
             <p class="form-description">
               {{
                 isEdit
-                  ? '비밀번호를 입력하면 제목과 내용을 수정할 수 있습니다.'
+                  ? '제목과 내용을 수정한 뒤 저장해주세요.'
                   : '익명으로 작성되며, 수정·삭제 시 비밀번호가 필요합니다.'
               }}
             </p>
@@ -60,7 +60,7 @@
           />
         </div>
 
-        <div class="form-row">
+        <div v-if="!isEdit" class="form-row">
           <label for="password">비밀번호</label>
           <input
             id="password"
@@ -90,7 +90,8 @@ import {
   createPost,
   updatePost,
   getPostById,
-  validatePostPassword,
+  hasEditAccess,
+  revokeEditAccess,
 } from '@/stores/posts'
 
 const router = useRouter()
@@ -106,9 +107,14 @@ const isEdit = computed(() => Boolean(route.params.id))
 
 onMounted(() => {
   if (isEdit.value) {
-    const current = getPostById(route.params.id)
+    const postId = route.params.id
+    const current = getPostById(postId)
     if (!current) {
       router.push({ name: 'board-list' })
+      return
+    }
+    if (!hasEditAccess(postId)) {
+      router.push({ name: 'post-detail', params: { id: postId } })
       return
     }
 
@@ -118,26 +124,37 @@ onMounted(() => {
 })
 
 function cancel() {
+  if (isEdit.value) {
+    revokeEditAccess(route.params.id)
+    router.push({ name: 'post-detail', params: { id: route.params.id } })
+    return
+  }
   router.push({ name: 'board-list' })
 }
 
 function submitPost() {
-  if (!form.title.trim() || !form.body.trim() || !form.password.trim()) {
-    alert('제목, 내용, 비밀번호를 모두 입력해주세요.')
+  if (!form.title.trim() || !form.body.trim()) {
+    alert('제목과 내용을 모두 입력해주세요.')
     return
   }
 
   if (isEdit.value) {
     const id = route.params.id
-    if (!validatePostPassword(id, form.password)) {
-      alert('비밀번호가 일치하지 않습니다.')
+    if (!hasEditAccess(id)) {
+      router.push({ name: 'post-detail', params: { id } })
       return
     }
     updatePost(id, {
       title: form.title,
       body: form.body,
     })
+    revokeEditAccess(id)
     router.push({ name: 'post-detail', params: { id } })
+    return
+  }
+
+  if (!form.password.trim()) {
+    alert('비밀번호를 입력해주세요.')
     return
   }
 
