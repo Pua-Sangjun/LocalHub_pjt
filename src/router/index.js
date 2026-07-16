@@ -1,12 +1,12 @@
-import { createRouter, createWebHistory } from 'vue-router'
 import AppLayout from '@/layouts/AppLayout.vue'
-import HomeView from '@/views/HomeView.vue'
+import AttractionDetailView from '@/views/AttractionDetailView.vue'
 import AttractionsView from '@/views/AttractionsView.vue'
 import BoardListView from '@/views/BoardListView.vue'
+import HomeView from '@/views/HomeView.vue'
+import MapView from '@/views/MapView.vue'
 import PostDetailView from '@/views/PostDetailView.vue'
 import PostFormView from '@/views/PostFormView.vue'
-import MapView from '@/views/MapView.vue'
-import AttractionDetailView from '@/views/AttractionDetailView.vue'
+import { createRouter, createWebHistory } from 'vue-router'
 
 const routes = [
   {
