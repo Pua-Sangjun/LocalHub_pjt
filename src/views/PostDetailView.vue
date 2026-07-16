@@ -20,7 +20,7 @@
               <span>좋아요 {{ post.likes }}</span>
             </div>
           </div>
-          <button class="secondary-btn desktop-only" type="button" @click="goBack">목록으로</button>
+          <button class="secondary-btn desktop-only" type="button" @click="goBack">목록</button>
         </div>
       </header>
 
@@ -35,7 +35,7 @@
         </div>
 
         <div v-if="post" class="detail-actions">
-          <button class="secondary-btn mobile-only" type="button" @click="goBack">목록으로</button>
+          <button class="secondary-btn mobile-only" type="button" @click="goBack">목록</button>
           <button class="secondary-btn" type="button" @click="openEditModal">수정</button>
           <button class="primary-btn" type="button" @click="likePost">좋아요</button>
           <button class="danger-btn" type="button" @click="openDeleteModal">삭제</button>

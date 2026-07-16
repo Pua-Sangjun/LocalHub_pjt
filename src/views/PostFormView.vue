@@ -17,12 +17,12 @@
               {{
                 isEdit
                   ? '제목과 내용을 수정한 뒤 저장해주세요.'
-                  : '익명으로 작성되며, 수정·삭제 시 비밀번호가 필요합니다.'
+                  : ''
               }}
             </p>
           </div>
           <button class="secondary-btn desktop-only" type="button" @click="cancel">
-            목록으로
+            목록
           </button>
         </div>
       </header>
@@ -31,7 +31,7 @@
         <span class="notice-icon" aria-hidden="true">🔒</span>
         <div>
           <strong>익명 게시판 안내</strong>
-          <p>로그인 없이 글을 남길 수 있습니다. 작성 시 설정한 비밀번호로만 수정·삭제가 가능합니다.</p>
+          <p>로그인 없이 익명으로 글을 남기세요. 작성 시 설정한 비밀번호로만 수정·삭제가 가능합니다.</p>
         </div>
       </section>
 
