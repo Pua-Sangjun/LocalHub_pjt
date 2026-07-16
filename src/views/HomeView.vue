@@ -53,7 +53,6 @@
               <span class="emoji-icon">📍</span>
               <div>
                 <h3>서울 관광 지도 미리보기</h3>
-                <p class="card-subtitle">한국관광공사 Tour API 기반 783개 관광지</p>
               </div>
             </div>
             <button class="text-btn" type="button" @click="goToAttractions">지도에서 더 보기 →</button>
@@ -105,7 +104,6 @@
               <span class="emoji-icon">📊</span>
               <div>
                 <h3>공공데이터 기반 서비스</h3>
-                <p class="card-subtitle"> </p>
               </div>
             </div>
           </div>

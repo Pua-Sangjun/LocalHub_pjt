@@ -17,7 +17,7 @@
               <span class="post-badge">익명</span>
               <time>{{ formattedDate(post.createdAt) }}</time>
               <span>조회 {{ post.views }}</span>
-              <span>좋아요 {{ post.likes }}</span>
+              <LikeButton :post-id="post.id" :count="post.likes" compact />
             </div>
           </div>
           <button class="secondary-btn desktop-only" type="button" @click="goBack">목록</button>
@@ -36,8 +36,9 @@
 
         <div v-if="post" class="detail-actions">
           <button class="secondary-btn mobile-only" type="button" @click="goBack">목록</button>
+          <LikeButton :post-id="post.id" :count="post.likes" />
           <button class="secondary-btn" type="button" @click="openEditModal">수정</button>
-          <button class="primary-btn" type="button" @click="likePost">좋아요</button>
+
           <button class="danger-btn" type="button" @click="openDeleteModal">삭제</button>
         </div>
       </section>
@@ -91,6 +92,7 @@
 import { computed, nextTick, onMounted, ref } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import ShareButton from '@/components/ShareButton.vue'
+import LikeButton from '@/components/LikeButton.vue'
 import {
   getPostById,
   incrementViews,
@@ -98,7 +100,6 @@ import {
   validatePostPassword,
   grantEditAccess,
   revokeEditAccess,
-  toggleLike,
 } from '@/stores/posts'
 
 const router = useRouter()
@@ -176,11 +177,6 @@ function confirmPasswordModal() {
   removePost(id)
   closePasswordModal()
   router.push({ name: 'board-list' })
-}
-
-function likePost() {
-  if (!post.value) return
-  toggleLike(id)
 }
 </script>
 

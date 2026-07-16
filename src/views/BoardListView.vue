@@ -53,7 +53,7 @@
               <div class="post-meta">
                 <time>{{ formattedDate(post.createdAt) }}</time>
                 <span>조회 {{ post.views }}</span>
-                <span>좋아요 {{ post.likes }}</span>
+                <LikeButton :post-id="post.id" :count="post.likes" compact />
               </div>
             </div>
           </RouterLink>
@@ -73,6 +73,7 @@
 <script setup>
 import { ref, computed } from 'vue'
 import { useRouter } from 'vue-router'
+import LikeButton from '@/components/LikeButton.vue'
 import { posts } from '@/stores/posts'
 
 const router = useRouter()
