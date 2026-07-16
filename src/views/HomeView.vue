@@ -30,10 +30,26 @@
           </div>
         </div>
 
-        <div class="carousel-controls">
-          <button type="button" @click="prevSlide" aria-label="Previous slide">‹</button>
-          <button type="button" @click="nextSlide" aria-label="Next slide">›</button>
-        </div>
+        <button
+          type="button"
+          class="carousel-nav carousel-nav-prev"
+          aria-label="이전 슬라이드"
+          @click="prevSlide"
+        >
+          <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+            <path d="M15 6l-6 6 6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+          </svg>
+        </button>
+        <button
+          type="button"
+          class="carousel-nav carousel-nav-next"
+          aria-label="다음 슬라이드"
+          @click="nextSlide"
+        >
+          <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+            <path d="M9 6l6 6-6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+          </svg>
+        </button>
       </div>
     </section>
 
