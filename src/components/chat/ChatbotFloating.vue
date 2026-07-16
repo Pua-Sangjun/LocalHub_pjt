@@ -28,7 +28,23 @@
           >
             <div :class="['chat-bubble', item.role]">
               <span class="bubble-label">{{ item.role === 'user' ? '나' : '챗봇' }}</span>
-              <p>{{ item.text }}</p>
+              <div v-if="item.role === 'bot'" class="message-body">
+                <template
+                  v-for="(block, blockIndex) in formatMessageBlocks(item.text)"
+                  :key="`${index}-${blockIndex}`"
+                >
+                  <p class="message-line" :class="{ 'message-heading': block.icon === '✨' }">
+                    <span class="message-icon">{{ block.icon }}</span>
+                    <span class="message-text">
+                      <template v-for="(segment, segmentIndex) in block.segments" :key="segmentIndex">
+                        <strong v-if="segment.bold">{{ segment.text }}</strong>
+                        <template v-else>{{ segment.text }}</template>
+                      </template>
+                    </span>
+                  </p>
+                </template>
+              </div>
+              <p v-else>{{ item.text }}</p>
             </div>
           </div>
 
@@ -93,6 +109,7 @@ import { ref, watch, onMounted, onUnmounted, nextTick } from 'vue'
 import { sendChatMessage } from '@/api/chat'
 import { buildChatContext, SUGGESTED_QUESTIONS } from '@/utils/chatContext'
 import { buildFestivalContext } from '@/utils/festivalReply'
+import { formatChatMessageBlocks } from '@/utils/chatFormatting'
 import { loadTourData } from '@/utils/dataService'
 import { getPosts } from '@/stores/posts'
 import { useChatbot } from '@/composables/useChatbot'
@@ -224,6 +241,10 @@ async function sendQuestion() {
 function askSuggestion(text) {
   question.value = text
   nextTick(() => sendQuestion())
+}
+
+function formatMessageBlocks(text) {
+  return formatChatMessageBlocks(text)
 }
 </script>
 
@@ -404,6 +425,48 @@ function askSuggestion(text) {
   margin: 0.25rem 0 0;
   white-space: pre-wrap;
   word-break: break-word;
+}
+
+.message-body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  margin-top: 0.25rem;
+}
+
+.message-line {
+  margin: 0;
+  line-height: 1.65;
+  display: flex;
+  align-items: flex-start;
+  gap: 0.4rem;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.message-heading .message-text {
+  font-weight: 700;
+}
+
+.message-line .message-text strong {
+  font-weight: 700;
+}
+
+.message-icon {
+  flex-shrink: 0;
+  width: 1.2rem;
+  text-align: center;
+  line-height: 1.65;
+}
+
+.message-text {
+  flex: 1;
+  min-width: 0;
+}
+
+.message-body strong {
+  font-weight: 700;
+  color: #0f4c81;
 }
 
 .bubble-label {

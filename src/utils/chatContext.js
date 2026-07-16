@@ -157,6 +157,12 @@ const SEOUL_DISTRICTS = [
     if (intents.length) {
       summaryParts.push(`질문 유형: ${intents.join(', ')}`)
     }
+
+    if (intents.includes('festival') || intents.includes('course') || intents.includes('board')) {
+      summaryParts.push(
+        '답변 시 `-` `•` 불릿 없이 이모지만 사용: 🎪축제 🏛️관광지 🏃레포츠 🗺️코스 📅일정 📍장소 💰요금 📝게시글',
+      )
+    }
   
     summaryParts.push(`전체 관광 데이터: ${tourItems.length}건, 커뮤니티 게시글: ${posts.length}건`)
   
