@@ -1,3 +1,5 @@
+import { isFestivalNotEnded } from './festivalReply.js'
+
 const SEOUL_DISTRICTS = [
     '종로', '중구', '용산', '성동', '광진', '동대문', '중랑', '성북', '강북', '도봉',
     '노원', '은평', '서대문', '마포', '양천', '강서', '구로', '금천', '영등포', '동작',
@@ -126,8 +128,14 @@ const SEOUL_DISTRICTS = [
     const keywords = extractKeywords(text)
     const districts = detectDistricts(text)
     const intents = detectIntent(text)
-  
-    const rankedTours = tourItems
+    const today = new Date()
+
+    const activeTourItems = tourItems.filter((item) => {
+      if (item.dataType !== '축제공연행사') return true
+      return isFestivalNotEnded(item, today)
+    })
+
+    const rankedTours = activeTourItems
       .map((item) => ({ item, score: scoreTourItem(item, keywords, districts, intents) }))
       .filter(({ score }) => score > 0)
       .sort((a, b) => b.score - a.score)
@@ -169,7 +177,7 @@ const SEOUL_DISTRICTS = [
     }
   
     if (!rankedTours.length && !rankedPosts.length && districts.length) {
-      const districtFallback = tourItems
+      const districtFallback = activeTourItems
         .filter((item) => matchesDistrict(item, districts))
         .slice(0, 6)
         .map(summarizeTourItem)

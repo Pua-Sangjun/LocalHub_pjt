@@ -92,6 +92,7 @@
 import { ref, watch, onMounted, onUnmounted, nextTick } from 'vue'
 import { sendChatMessage } from '@/api/chat'
 import { buildChatContext, SUGGESTED_QUESTIONS } from '@/utils/chatContext'
+import { buildFestivalContext } from '@/utils/festivalReply'
 import { loadTourData } from '@/utils/dataService'
 import { getPosts } from '@/stores/posts'
 import { useChatbot } from '@/composables/useChatbot'
@@ -195,12 +196,18 @@ async function sendQuestion() {
   await scrollToBottom()
 
   try {
-    const context = buildChatContext(text, tourItems.value, getPosts())
+    if (!tourItems.value.length) {
+      tourItems.value = await loadTourData()
+    }
+
+    const festivalContext = buildFestivalContext(text, tourItems.value)
+    const context = festivalContext || buildChatContext(text, tourItems.value, getPosts())
     const reply = await sendChatMessage({
       message: text,
       history: toApiHistory().slice(0, -1),
       context,
     })
+
     messages.value.push({ role: 'bot', text: reply })
   } catch (error) {
     messages.value.push({
@@ -236,11 +243,11 @@ function askSuggestion(text) {
   height: 56px;
   border-radius: 50%;
   border: none;
-  background: linear-gradient(135deg, #4f46e5, #6366f1);
-  color: white;
+  background: linear-gradient(135deg, #8fd3ff 0%, #7dd3fc 100%);
+  color: #0f172a;
   font-size: 1.25rem;
   cursor: pointer;
-  box-shadow: 0 12px 30px rgba(79, 70, 229, 0.35);
+  box-shadow: 0 12px 30px rgba(56, 189, 248, 0.28);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -252,8 +259,9 @@ function askSuggestion(text) {
 }
 
 .chat-panel {
-  width: min(380px, calc(100vw - 2rem));
-  max-height: min(560px, calc(100vh - 6rem));
+  width: clamp(300px, 32vw, 480px);
+  height: clamp(420px, 72vh, 720px);
+  max-height: calc(100vh - 5rem);
   margin-bottom: 0.75rem;
   background: #ffffff;
   border-radius: 1.1rem;
@@ -269,15 +277,16 @@ function askSuggestion(text) {
   left: 0;
   bottom: 0;
   width: 100%;
-  max-height: 85vh;
+  height: auto;
+  max-height: 88vh;
   margin-bottom: 0;
   border-radius: 1.1rem 1.1rem 0 0;
 }
 
 .chat-header {
   padding: 0.9rem 1rem;
-  background: linear-gradient(135deg, #4f46e5, #4338ca);
-  color: white;
+  background: linear-gradient(135deg, #8fd3ff 0%, #7dd3fc 100%);
+  color: #0f172a;
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -293,7 +302,7 @@ function askSuggestion(text) {
 .chat-header-info p {
   margin: 0.15rem 0 0;
   font-size: 0.75rem;
-  opacity: 0.85;
+  opacity: 0.75;
 }
 
 .chat-avatar {
@@ -307,8 +316,8 @@ function askSuggestion(text) {
 
 .icon-btn {
   border: none;
-  background: rgba(255, 255, 255, 0.15);
-  color: white;
+  background: rgba(15, 23, 42, 0.08);
+  color: #0f172a;
   width: 32px;
   height: 32px;
   border-radius: 8px;
@@ -322,7 +331,7 @@ function askSuggestion(text) {
   gap: 0.75rem;
   overflow-y: auto;
   flex: 1;
-  min-height: 220px;
+  min-height: clamp(200px, 35vh, 360px);
   background: #f8fafc;
 }
 
@@ -359,9 +368,9 @@ function askSuggestion(text) {
 }
 
 .suggestion-chip {
-  border: 1px solid #c7d2fe;
-  background: #eef2ff;
-  color: #3730a3;
+  border: 1px solid #8fd3ff;
+  background: #eef6ff;
+  color: #1a5fa0;
   border-radius: 999px;
   padding: 0.4rem 0.75rem;
   font-size: 0.78rem;
@@ -404,8 +413,8 @@ function askSuggestion(text) {
 }
 
 .chat-bubble.bot {
-  background: #eef2ff;
-  color: #1e3a8a;
+  background: #eef6ff;
+  color: #1a5fa0;
   border-bottom-left-radius: 0.25rem;
 }
 
@@ -431,7 +440,7 @@ function askSuggestion(text) {
   width: 6px;
   height: 6px;
   border-radius: 50%;
-  background: #6366f1;
+  background: #38bdf8;
   animation: blink 1.2s infinite;
 }
 
@@ -470,8 +479,8 @@ function askSuggestion(text) {
 }
 
 .chat-input-area input:focus {
-  border-color: #6366f1;
-  box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.15);
+  border-color: #8fd3ff;
+  box-shadow: 0 0 0 2px rgba(143, 211, 255, 0.35);
 }
 
 .send-btn {
@@ -479,8 +488,8 @@ function askSuggestion(text) {
   height: 42px;
   padding: 0 1rem;
   border: none;
-  background: #4f46e5;
-  color: white;
+  background: #8fd3ff;
+  color: #0f172a;
   border-radius: 0.75rem;
   cursor: pointer;
   font-weight: 600;
