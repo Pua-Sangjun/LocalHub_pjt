@@ -118,7 +118,7 @@
           />
           <div v-else class="state-panel compact map-empty">표시할 명소가 없습니다.</div>
 
-          <div v-if="!gridLoading && pageItems.length" class="place-strip">
+          <div v-show="pageItems.length" class="place-strip">
             <button
               v-for="place in pageItems"
               :key="`strip-${place.id}`"
@@ -135,73 +135,65 @@
         <div class="explore-divider" aria-hidden="true"></div>
 
         <div class="explore-list">
-          <div v-if="!pageItems.length" class="state-panel compact">
+          <div v-if="!pageItems.length && !gridLoading" class="state-panel compact">
             조건에 맞는 관광지가 없습니다.
           </div>
 
-          <div v-if="gridLoading" class="attraction-grid" aria-hidden="true">
-            <div
-              v-for="index in PAGE_SIZE"
-              :key="`skeleton-${index}`"
-              class="attraction-card skeleton-card"
-            >
-              <div class="skeleton-block skeleton-image"></div>
-              <div class="card-body">
-                <div class="skeleton-block skeleton-title"></div>
-                <div class="skeleton-block skeleton-text"></div>
-                <div class="skeleton-block skeleton-badge"></div>
-              </div>
-            </div>
-          </div>
-
-          <div v-else class="attraction-grid">
-            <article
-              v-for="place in pageItems"
-              :key="place.id"
-              :id="`attraction-${place.id}`"
-              class="attraction-card"
-              :class="{ active: activeId === place.id }"
-            >
-              <button
-                type="button"
-                class="attraction-card-main"
-                @click="selectPlaceFromCard(place.id)"
+          <div
+            v-else
+            class="attraction-grid-shell"
+            :class="{ 'is-transitioning': gridLoading }"
+            :aria-busy="gridLoading"
+          >
+            <div class="attraction-grid content-grid">
+              <article
+                v-for="place in pageItems"
+                :key="place.id"
+                :id="`attraction-${place.id}`"
+                class="attraction-card"
+                :class="{ active: activeId === place.id }"
               >
-                <div class="card-image-wrap">
-                  <div
-                    v-if="shouldShowImageSkeleton(place)"
-                    class="skeleton-block skeleton-image-fill"
-                  ></div>
-                  <img
-                    v-if="place.firstimage && !isImageFailed(place.id)"
-                    :ref="(el) => registerImage(el, place.id)"
-                    :src="place.firstimage"
-                    :alt="place.title"
-                    :class="{ 'is-loaded': shouldShowImage(place) }"
-                    @load="markImageLoaded(place.id)"
-                    @error="onImageError(place.id)"
-                  />
-                  <div
-                    v-else-if="shouldShowImageEmpty(place)"
-                    class="image-fallback image-empty"
-                  >
-                    <span class="image-empty-icon" aria-hidden="true">📷</span>
-                    <span class="image-empty-text">이미지 없음</span>
+                <button
+                  type="button"
+                  class="attraction-card-main"
+                  @click="selectPlaceFromCard(place.id)"
+                >
+                  <div class="card-image-wrap">
+                    <div
+                      v-if="shouldShowImageSkeleton(place)"
+                      class="skeleton-block skeleton-image-fill"
+                    ></div>
+                    <img
+                      v-if="place.firstimage && !isImageFailed(place.id)"
+                      :ref="(el) => registerImage(el, place.id)"
+                      :src="place.firstimage"
+                      :alt="place.title"
+                      :class="{ 'is-loaded': shouldShowImage(place) }"
+                      @load="markImageLoaded(place.id)"
+                      @error="onImageError(place.id)"
+                    />
+                    <div
+                      v-else-if="shouldShowImageEmpty(place)"
+                      class="image-fallback image-empty"
+                    >
+                      <span class="image-empty-icon" aria-hidden="true">📷</span>
+                      <span class="image-empty-text">이미지 없음</span>
+                    </div>
                   </div>
-                </div>
-                <div class="card-body">
-                  <h3>{{ place.title }}</h3>
-                  <p>{{ place.addr1 }}</p>
-                  <span class="card-region">{{ place.region }}</span>
-                </div>
-              </button>
-              <ShareButton
-                mode="attraction"
-                :place="place"
-                compact
-                button-class="card-share-btn"
-              />
-            </article>
+                  <div class="card-body">
+                    <h3>{{ place.title }}</h3>
+                    <p>{{ place.addr1 }}</p>
+                    <span class="card-region">{{ place.region }}</span>
+                  </div>
+                </button>
+                <ShareButton
+                  mode="attraction"
+                  :place="place"
+                  compact
+                  button-class="card-share-btn"
+                />
+              </article>
+            </div>
           </div>
 
           <nav v-if="totalPages > 1" class="pagination" aria-label="페이지네이션">
@@ -209,7 +201,7 @@
               <button
                 type="button"
                 class="pagination-nav"
-                :disabled="currentPage === 1"
+                :disabled="gridLoading || currentPage === 1"
                 @click="goToPage(currentPage - 1)"
               >
                 이전
@@ -218,7 +210,7 @@
               <button
                 type="button"
                 class="pagination-nav"
-                :disabled="currentPage === totalPages"
+                :disabled="gridLoading || currentPage === totalPages"
                 @click="goToPage(currentPage + 1)"
               >
                 다음
@@ -226,13 +218,18 @@
             </template>
 
             <template v-else>
-              <button type="button" class="pagination-edge" :disabled="currentPage === 1" @click="goToPage(1)">
+              <button
+                type="button"
+                class="pagination-edge"
+                :disabled="gridLoading || currentPage === 1"
+                @click="goToPage(1)"
+              >
                 처음
               </button>
               <button
                 type="button"
                 class="pagination-nav"
-                :disabled="currentPage === 1"
+                :disabled="gridLoading || currentPage === 1"
                 @click="goToPage(currentPage - 1)"
               >
                 이전
@@ -243,6 +240,7 @@
                 type="button"
                 class="page-number"
                 :class="{ active: page === currentPage }"
+                :disabled="gridLoading"
                 @click="goToPage(page)"
               >
                 {{ page }}
@@ -250,7 +248,7 @@
               <button
                 type="button"
                 class="pagination-nav"
-                :disabled="currentPage === totalPages"
+                :disabled="gridLoading || currentPage === totalPages"
                 @click="goToPage(currentPage + 1)"
               >
                 다음
@@ -258,7 +256,7 @@
               <button
                 type="button"
                 class="pagination-edge"
-                :disabled="currentPage === totalPages"
+                :disabled="gridLoading || currentPage === totalPages"
                 @click="goToPage(totalPages)"
               >
                 마지막
@@ -303,6 +301,7 @@ const isCompactPagination = ref(false)
 let paginationMediaQuery = null
 const loadedImageIds = ref(new Set())
 const failedImageIds = ref(new Set())
+let pageLoadToken = 0
 
 const regionOptions = computed(() => getRegionOptions(attractions.value))
 
@@ -344,10 +343,11 @@ const visiblePages = computed(() => {
 })
 
 watch([selectedCategory, selectedRegion, keyword, selectedSort], async () => {
-  currentPage.value = 1
-  activeId.value = ''
   if (!loading.value) {
-    await changePage(1)
+    await goToPage(1, { force: true })
+  } else {
+    currentPage.value = 1
+    activeId.value = ''
   }
 })
 
@@ -409,25 +409,29 @@ function preloadPageImages(items) {
   return Promise.all(loaders)
 }
 
-async function waitForPageReady(items) {
-  const start = Date.now()
-  gridLoading.value = true
-  await preloadPageImages(items)
+async function goToPage(page, options = {}) {
+  const force = options.force === true
+  if (gridLoading.value || page < 1 || page > totalPages.value) return
+  if (!force && page === currentPage.value) return
 
-  const elapsed = Date.now() - start
-  if (elapsed < 320) {
-    await new Promise((resolve) => setTimeout(resolve, 320 - elapsed))
-  }
+  const token = ++pageLoadToken
+  activeId.value = options.keepActive ? activeId.value : ''
+  currentPage.value = page
+
+  const targetItems = paginateItems(filteredPlaces.value, page, PAGE_SIZE).items
+  const needsPreload = targetItems.some(
+    (place) => place.firstimage && !loadedImageIds.value.has(place.id) && !failedImageIds.value.has(place.id),
+  )
+
+  if (!needsPreload) return
+
+  gridLoading.value = true
+  await nextTick()
+  await preloadPageImages(targetItems)
+
+  if (token !== pageLoadToken) return
 
   gridLoading.value = false
-}
-
-async function changePage(page, options = {}) {
-  currentPage.value = page
-  activeId.value = options.activeId ?? ''
-
-  await nextTick()
-  await waitForPageReady(pageItems.value)
 }
 
 function selectPlaceFromCard(id) {
@@ -442,11 +446,6 @@ function selectPlaceFromMarker(id) {
   activeId.value = id
 }
 
-async function goToPage(page) {
-  activeId.value = ''
-  await changePage(page)
-}
-
 function updatePaginationMode(event) {
   isCompactPagination.value = event.matches
 }
@@ -459,7 +458,7 @@ onMounted(async () => {
   try {
     attractions.value = await loadAttractions()
     await nextTick()
-    await waitForPageReady(pageItems.value)
+    await preloadPageImages(pageItems.value)
   } catch (err) {
     error.value = err?.message || '관광지 데이터를 불러오지 못했습니다.'
   } finally {
