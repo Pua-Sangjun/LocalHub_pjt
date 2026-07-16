@@ -257,7 +257,6 @@
   align-items: flex-start;
   gap: 12px;
   flex-wrap: wrap;
-  margin-bottom: 22px;
   padding-bottom: 16px;
   border-bottom: 1px solid #f1f5f9;
 }
@@ -392,7 +391,7 @@
   padding: 28px 16px;
   text-align: center;
   color: #64748b;
-  background: #f8fafc;
+  background:#f8fafc;
   border-radius: 14px;
 }
 
@@ -415,6 +414,7 @@
   display: flex;
   flex-direction: column;
   gap: 6px;
+  align-items: center;
 }
 
 .stat-item strong {

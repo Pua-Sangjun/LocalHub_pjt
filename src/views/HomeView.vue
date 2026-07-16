@@ -73,13 +73,12 @@
             <div class="title-area">
               <span class="emoji-icon">💬</span>
               <div>
-                <h3>익명 로컬 피드</h3>
-                <p class="card-subtitle">로그인 없이 글쓰기 · 비밀번호로 수정/삭제</p>
+                <h3>로컬 이야기
+                </h3>
               </div>
             </div>
             <div class="header-actions">
               <button class="text-btn" type="button" @click="goToBoard">전체 보기 →</button>
-              <button class="write-btn" type="button" @click="goToWrite">✏️ 글쓰기</button>
             </div>
           </div>
 
@@ -106,7 +105,7 @@
               <span class="emoji-icon">📊</span>
               <div>
                 <h3>공공데이터 기반 서비스</h3>
-                <p class="card-subtitle">백엔드 없이 JSON 데이터로 동작하는 LocalHub MVP</p>
+                <p class="card-subtitle"> </p>
               </div>
             </div>
           </div>
@@ -118,10 +117,6 @@
             </div>
           </div>
 
-          <p class="source-note">
-            이 서비스는 한국관광공사 Tour API(TourAPI 4.0) 데이터를 활용하였습니다.
-            출처: 한국관광공사 · 라이선스: 공공누리 제3유형
-          </p>
         </section>
       </main>
     </div>
