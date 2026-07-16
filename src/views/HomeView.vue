@@ -53,30 +53,6 @@
       </div>
     </section>
 
-    <section class="quick-access-row">
-      <template v-for="card in quickAccessCards" :key="card.title">
-        <button
-          v-if="card.action === 'chat'"
-          type="button"
-          :class="['info-card', 'clickable', { accent: card.accent }]"
-          @click="toggleChat"
-        >
-          <span class="card-icon" aria-hidden="true">{{ card.icon }}</span>
-          <span class="card-title">{{ card.title }}</span>
-          <p>{{ card.description }}</p>
-        </button>
-        <RouterLink
-          v-else
-          :to="card.to"
-          :class="['info-card', 'clickable', { accent: card.accent }]"
-        >
-          <span class="card-icon" aria-hidden="true">{{ card.icon }}</span>
-          <span class="card-title">{{ card.title }}</span>
-          <p>{{ card.description }}</p>
-        </RouterLink>
-      </template>
-    </section>
-
     <div class="home-content-area">
       <main class="main-content">
         <section class="card map-section">
