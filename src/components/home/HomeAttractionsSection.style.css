@@ -257,6 +257,21 @@
   gap: 16px;
 }
 
+.attraction-grid-shell {
+  position: relative;
+  width: 100%;
+}
+
+.attraction-grid-shell.is-transitioning .content-grid {
+  opacity: 0.72;
+  pointer-events: none;
+  transition: opacity 0.18s ease;
+}
+
+.content-grid {
+  transition: opacity 0.18s ease;
+}
+
 .attraction-card {
   display: flex;
   flex-direction: column;
@@ -464,12 +479,19 @@
 
 .card-body {
   padding: 14px 16px 16px;
+  min-height: 118px;
 }
 
 .card-body h3 {
   margin: 0 0 8px;
   font-size: 1.02rem;
   color: #0f172a;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+  min-height: 2.5em;
+  line-height: 1.25;
 }
 
 .card-body p {
@@ -477,6 +499,11 @@
   color: #64748b;
   font-size: 0.84rem;
   line-height: 1.5;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+  min-height: 2.55em;
 }
 
 .card-region {
@@ -502,6 +529,7 @@
   align-items: center;
   margin-top: 4px;
   width: 100%;
+  min-height: 44px;
 }
 
 .pagination-meta {
