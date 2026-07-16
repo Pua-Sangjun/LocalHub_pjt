@@ -36,23 +36,67 @@
 
         <div v-if="post" class="detail-actions">
           <button class="secondary-btn mobile-only" type="button" @click="goBack">목록으로</button>
-          <button class="secondary-btn" type="button" @click="editPost">수정</button>
+          <button class="secondary-btn" type="button" @click="openEditModal">수정</button>
           <button class="primary-btn" type="button" @click="likePost">좋아요</button>
-          <button class="danger-btn" type="button" @click="deletePost">삭제</button>
+          <button class="danger-btn" type="button" @click="openDeleteModal">삭제</button>
         </div>
       </section>
+    </div>
+
+    <div
+      v-if="passwordModalMode"
+      class="password-modal-backdrop"
+      @click.self="closePasswordModal"
+    >
+      <div class="password-modal" role="dialog" :aria-labelledby="passwordModalTitleId">
+        <h2 :id="passwordModalTitleId">
+          {{ passwordModalMode === 'edit' ? '게시글 수정' : '게시글 삭제' }}
+        </h2>
+        <p>
+          {{
+            passwordModalMode === 'edit'
+              ? '수정하려면 작성 시 설정한 비밀번호를 입력해주세요.'
+              : '삭제하려면 작성 시 설정한 비밀번호를 입력해주세요.'
+          }}
+        </p>
+
+        <form @submit.prevent="confirmPasswordModal">
+          <label for="post-password">비밀번호</label>
+          <input
+            id="post-password"
+            ref="passwordInputRef"
+            v-model="passwordInput"
+            type="password"
+            placeholder="비밀번호 입력"
+            autocomplete="current-password"
+          />
+          <p v-if="passwordError" class="password-error">{{ passwordError }}</p>
+
+          <div class="password-modal-actions">
+            <button class="secondary-btn" type="button" @click="closePasswordModal">취소</button>
+            <button
+              :class="passwordModalMode === 'delete' ? 'danger-btn' : 'primary-btn'"
+              type="submit"
+            >
+              {{ passwordModalMode === 'edit' ? '확인' : '삭제' }}
+            </button>
+          </div>
+        </form>
+      </div>
     </div>
   </div>
 </template>
 
 <script setup>
-import { computed, onMounted } from 'vue'
+import { computed, nextTick, onMounted, ref } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import {
   getPostById,
   incrementViews,
   deletePost as removePost,
   validatePostPassword,
+  grantEditAccess,
+  revokeEditAccess,
   toggleLike,
 } from '@/stores/posts'
 
@@ -61,6 +105,14 @@ const route = useRoute()
 const id = route.params.id
 
 const post = computed(() => getPostById(id))
+const passwordModalMode = ref(null)
+const passwordInput = ref('')
+const passwordError = ref('')
+const passwordInputRef = ref(null)
+
+const passwordModalTitleId = computed(() =>
+  passwordModalMode.value === 'edit' ? 'edit-password-title' : 'delete-password-title'
+)
 
 onMounted(() => {
   if (post.value) {
@@ -79,25 +131,55 @@ function goBack() {
   router.push({ name: 'board-list' })
 }
 
-function editPost() {
-  router.push({ name: 'post-edit', params: { id } })
+async function openPasswordModal(mode) {
+  passwordModalMode.value = mode
+  passwordInput.value = ''
+  passwordError.value = ''
+  await nextTick()
+  passwordInputRef.value?.focus()
+}
+
+function openEditModal() {
+  openPasswordModal('edit')
+}
+
+function openDeleteModal() {
+  openPasswordModal('delete')
+}
+
+function closePasswordModal() {
+  passwordModalMode.value = null
+  passwordInput.value = ''
+  passwordError.value = ''
+}
+
+function confirmPasswordModal() {
+  if (!post.value) return
+  if (!passwordInput.value.trim()) {
+    passwordError.value = '비밀번호를 입력해주세요.'
+    return
+  }
+  if (!validatePostPassword(id, passwordInput.value)) {
+    passwordError.value = '비밀번호가 일치하지 않습니다.'
+    return
+  }
+
+  if (passwordModalMode.value === 'edit') {
+    grantEditAccess(id)
+    closePasswordModal()
+    router.push({ name: 'post-edit', params: { id } })
+    return
+  }
+
+  revokeEditAccess(id)
+  removePost(id)
+  closePasswordModal()
+  router.push({ name: 'board-list' })
 }
 
 function likePost() {
   if (!post.value) return
   toggleLike(id)
-}
-
-function deletePost() {
-  if (!post.value) return
-  const password = window.prompt('삭제를 위해 비밀번호를 입력해주세요.')
-  if (!password) return
-  if (!validatePostPassword(id, password)) {
-    alert('비밀번호가 일치하지 않습니다.')
-    return
-  }
-  removePost(id)
-  router.push({ name: 'board-list' })
 }
 </script>
 
@@ -277,5 +359,77 @@ function deletePost() {
   .detail-actions .danger-btn {
     grid-column: 1 / -1;
   }
+}
+
+.password-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1200;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  background: rgba(15, 23, 42, 0.45);
+}
+
+.password-modal {
+  width: min(100%, 420px);
+  padding: 24px;
+  border-radius: 18px;
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  box-shadow: 0 24px 48px rgba(15, 23, 42, 0.18);
+}
+
+.password-modal h2 {
+  margin: 0 0 8px;
+  font-size: 1.2rem;
+  color: #0f172a;
+}
+
+.password-modal > p {
+  margin: 0 0 18px;
+  color: #64748b;
+  font-size: 0.92rem;
+  line-height: 1.6;
+}
+
+.password-modal form {
+  display: grid;
+  gap: 10px;
+}
+
+.password-modal label {
+  font-weight: 700;
+  color: #0f172a;
+  font-size: 0.9rem;
+}
+
+.password-modal input {
+  width: 100%;
+  border: 1px solid #cbd5e1;
+  border-radius: 12px;
+  padding: 12px 14px;
+  font-size: 0.95rem;
+  font-family: inherit;
+}
+
+.password-modal input:focus {
+  outline: none;
+  border-color: #8fd3ff;
+  box-shadow: 0 0 0 3px rgba(143, 211, 255, 0.35);
+}
+
+.password-error {
+  margin: 0;
+  color: #b91c1c;
+  font-size: 0.84rem;
+}
+
+.password-modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 8px;
 }
 </style>
