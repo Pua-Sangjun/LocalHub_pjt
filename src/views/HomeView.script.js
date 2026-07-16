@@ -50,28 +50,6 @@ export default defineComponent({
       },
     ]
 
-    const quickAccessCards = [
-      {
-        title: '서울 관광·지도',
-        description: '783개 관광지 공공데이터를 지도와 카드로 탐색합니다.',
-        to: '/attractions',
-        icon: '📍',
-      },
-      {
-        title: '익명 로컬 피드',
-        description: '회원가입 없이 팁을 남기고, 비밀번호로 수정·삭제합니다.',
-        to: '/board',
-        icon: '💬',
-      },
-      {
-        title: 'AI 서울 챗봇',
-        description: '궁금한 서울 여행 정보를 챗봇에게 바로 물어보세요.',
-        action: 'chat',
-        icon: '🤖',
-        accent: true,
-      },
-    ]
-
     const latestPosts = computed(() => posts.value.slice(0, 3))
 
     const activeSlide = ref(0)
@@ -145,7 +123,6 @@ export default defineComponent({
       previewPlaces,
       mapLoading,
       heroSlides,
-      quickAccessCards,
       dataStats: DATA_STATS,
       latestPosts,
       activeSlide,
