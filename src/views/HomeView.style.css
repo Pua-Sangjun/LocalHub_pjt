@@ -295,13 +295,6 @@
   margin: 0;
 }
 
-.card-subtitle {
-  margin: 4px 0 0;
-  font-size: 0.84rem;
-  color: #64748b;
-  font-weight: 500;
-}
-
 .spinner {
   width: 24px;
   height: 24px;
