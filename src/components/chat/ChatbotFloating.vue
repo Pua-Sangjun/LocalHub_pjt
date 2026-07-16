@@ -28,37 +28,7 @@
           >
             <div :class="['chat-bubble', item.role]">
               <span class="bubble-label">{{ item.role === 'user' ? '나' : '챗봇' }}</span>
-              <div v-if="item.role === 'bot'" class="message-body">
-                <template v-for="(block, blockIndex) in formatMessageBlocks(item.text)" :key="`${item.text}-${blockIndex}`">
-                  <p v-if="block.type === 'paragraph'" class="message-paragraph">
-                    <span class="message-icon">{{ block.icon }}</span>
-                    <span v-for="(segment, segmentIndex) in block.segments" :key="`${blockIndex}-${segmentIndex}`">
-                      <strong v-if="segment.bold">{{ segment.text }}</strong>
-                      <template v-else>{{ segment.text }}</template>
-                    </span>
-                  </p>
-                  <p v-else-if="block.type === 'heading'" class="message-heading">
-                    <span class="message-icon">{{ block.icon }}</span>
-                    <span v-for="(segment, segmentIndex) in block.segments" :key="`${blockIndex}-${segmentIndex}`">
-                      <strong v-if="segment.bold">{{ segment.text }}</strong>
-                      <template v-else>{{ segment.text }}</template>
-                    </span>
-                  </p>
-                  <div v-else-if="block.type === 'bullet' || block.type === 'number'" class="message-entry">
-                    <div class="message-entry-title">
-                      <span class="message-icon">{{ block.icon }}</span>
-                      <span v-for="(segment, segmentIndex) in block.segments" :key="`${blockIndex}-${segmentIndex}`">
-                        <strong v-if="segment.bold">{{ segment.text }}</strong>
-                        <template v-else>{{ segment.text }}</template>
-                      </span>
-                    </div>
-                    <div v-if="block.text.includes(':')" class="message-entry-body">
-                      {{ block.text.split(':')[1]?.trim() || '' }}
-                    </div>
-                  </div>
-                </template>
-              </div>
-              <p v-else>{{ item.text }}</p>
+              <p>{{ item.text }}</p>
             </div>
           </div>
 
@@ -125,8 +95,6 @@ import { buildChatContext, SUGGESTED_QUESTIONS } from '@/utils/chatContext'
 import { loadTourData } from '@/utils/dataService'
 import { getPosts } from '@/stores/posts'
 import { useChatbot } from '@/composables/useChatbot'
-import { formatChatMessageBlocks } from '@/utils/chatFormatting'
-import { buildFestivalReply } from '@/utils/festivalReply'
 
 const STORAGE_KEY = 'localhub-chat-history'
 
@@ -227,18 +195,12 @@ async function sendQuestion() {
   await scrollToBottom()
 
   try {
-    const festivalReply = buildFestivalReply(text, tourItems.value)
-    let reply = festivalReply
-
-    if (!reply) {
-      const context = buildChatContext(text, tourItems.value, getPosts())
-      reply = await sendChatMessage({
-        message: text,
-        history: toApiHistory().slice(0, -1),
-        context,
-      })
-    }
-
+    const context = buildChatContext(text, tourItems.value, getPosts())
+    const reply = await sendChatMessage({
+      message: text,
+      history: toApiHistory().slice(0, -1),
+      context,
+    })
     messages.value.push({ role: 'bot', text: reply })
   } catch (error) {
     messages.value.push({
@@ -255,10 +217,6 @@ async function sendQuestion() {
 function askSuggestion(text) {
   question.value = text
   nextTick(() => sendQuestion())
-}
-
-function formatMessageBlocks(text) {
-  return formatChatMessageBlocks(text)
 }
 </script>
 
@@ -294,12 +252,11 @@ function formatMessageBlocks(text) {
 }
 
 .chat-panel {
-  width: min(760px, calc(100vw - 2rem));
-  max-width: 760px;
-  max-height: min(760px, calc(100vh - 4rem));
+  width: min(380px, calc(100vw - 2rem));
+  max-height: min(560px, calc(100vh - 6rem));
   margin-bottom: 0.75rem;
   background: #ffffff;
-  border-radius: 1.2rem;
+  border-radius: 1.1rem;
   box-shadow: 0 24px 48px rgba(15, 23, 42, 0.18);
   overflow: hidden;
   display: flex;
@@ -312,8 +269,7 @@ function formatMessageBlocks(text) {
   left: 0;
   bottom: 0;
   width: 100%;
-  max-width: none;
-  max-height: 90vh;
+  max-height: 85vh;
   margin-bottom: 0;
   border-radius: 1.1rem 1.1rem 0 0;
 }
@@ -360,13 +316,13 @@ function formatMessageBlocks(text) {
 }
 
 .chat-body {
-  padding: 1rem 1.15rem;
+  padding: 1rem;
   display: flex;
   flex-direction: column;
-  gap: 0.85rem;
+  gap: 0.75rem;
   overflow-y: auto;
   flex: 1;
-  min-height: 320px;
+  min-height: 220px;
   background: #f8fafc;
 }
 
@@ -428,80 +384,17 @@ function formatMessageBlocks(text) {
 }
 
 .chat-bubble {
-  max-width: min(92%, 720px);
-  padding: 0.75rem 0.95rem;
+  max-width: 88%;
+  padding: 0.65rem 0.85rem;
   border-radius: 1rem;
-  font-size: 0.95rem;
-  line-height: 1.6;
-  word-break: break-word;
-  overflow-wrap: anywhere;
+  font-size: 0.9rem;
+  line-height: 1.45;
 }
 
 .chat-bubble p {
   margin: 0.25rem 0 0;
   white-space: pre-wrap;
   word-break: break-word;
-  overflow-wrap: anywhere;
-}
-
-.message-body {
-  display: flex;
-  flex-direction: column;
-  gap: 0.35rem;
-  margin-top: 0.25rem;
-}
-
-.message-paragraph,
-.message-heading,
-.message-entry-title {
-  margin: 0;
-  line-height: 1.7;
-  display: flex;
-  align-items: flex-start;
-  gap: 0.35rem;
-  flex-wrap: wrap;
-  white-space: pre-wrap;
-  overflow-wrap: anywhere;
-}
-
-.message-entry {
-  margin-top: 0.15rem;
-  color: #1e3a8a;
-  display: flex;
-  flex-direction: column;
-  gap: 0.2rem;
-}
-
-.message-entry-title {
-  font-weight: 700;
-  color: #1e3a8a;
-}
-
-.message-entry-body {
-  margin-left: 1.3rem;
-  color: #334155;
-  line-height: 1.7;
-  white-space: pre-wrap;
-  overflow-wrap: anywhere;
-}
-
-.message-heading {
-  font-weight: 700;
-  color: #3730a3;
-}
-
-.message-icon {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  margin-top: 0.08rem;
-  font-size: 0.95rem;
-  flex-shrink: 0;
-}
-
-.message-body strong {
-  font-weight: 800;
-  color: #3730a3;
 }
 
 .bubble-label {
