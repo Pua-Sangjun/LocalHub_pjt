@@ -4,7 +4,7 @@
       <div v-if="isChatOpen" class="chat-panel" role="dialog" aria-label="LocalHub 챗봇">
         <header class="chat-header">
           <div class="chat-header-info">
-            <span class="chat-avatar">🤖</span>
+            <span class="chat-avatar" aria-hidden="true">💬</span>
             <div>
               <strong>LocalHub 챗봇</strong>
               <p>서울 여행 · 축제 · 게시판 도우미</p>
@@ -93,13 +93,34 @@
       class="fab"
       type="button"
       :aria-expanded="isChatOpen"
-      aria-label="챗봇 열기"
+      :aria-label="isChatOpen ? '챗봇 닫기' : '챗봇 열기'"
       @click="toggleOpen"
     >
-      <svg v-if="!isChatOpen" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <svg
+        v-if="!isChatOpen"
+        class="fab-icon"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        stroke-width="2"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+        aria-hidden="true"
+      >
         <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
       </svg>
-      <span v-else>✕</span>
+      <svg
+        v-else
+        class="fab-icon"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        stroke-width="2.4"
+        stroke-linecap="round"
+        aria-hidden="true"
+      >
+        <path d="M7 7l10 10M17 7L7 17" />
+      </svg>
     </button>
   </div>
 </template>
@@ -266,17 +287,22 @@ function formatMessageBlocks(text) {
   border: none;
   background: linear-gradient(135deg, #8fd3ff 0%, #7dd3fc 100%);
   color: #0f172a;
-  font-size: 1.25rem;
   cursor: pointer;
   box-shadow: 0 12px 30px rgba(56, 189, 248, 0.28);
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: transform 0.2s ease;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.fab-icon {
+  width: 26px;
+  height: 26px;
 }
 
 .fab:hover {
   transform: translateY(-2px);
+  box-shadow: 0 14px 32px rgba(56, 189, 248, 0.34);
 }
 
 .chat-panel {
@@ -327,7 +353,8 @@ function formatMessageBlocks(text) {
 }
 
 .chat-avatar {
-  font-size: 1.4rem;
+  font-size: 1.35rem;
+  line-height: 1;
 }
 
 .chat-header-actions {
